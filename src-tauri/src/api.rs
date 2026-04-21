@@ -868,9 +868,15 @@ async fn report_api_error(
 // Models API Command
 #[tauri::command]
 pub async fn fetch_models(app: AppHandle) -> Result<Vec<Model>, String> {
-    // Get environment variables
-    let app_endpoint = get_app_endpoint()?;
-    let api_access_key = get_api_access_key()?;
+    // Get environment variables - return empty if not configured
+    let app_endpoint = match get_app_endpoint() {
+        Ok(endpoint) => endpoint,
+        Err(_) => return Ok(vec![]),
+    };
+    let api_access_key = match get_api_access_key() {
+        Ok(key) => key,
+        Err(_) => return Ok(vec![]),
+    };
 
     let _selected_model = match get_stored_credentials(&app).await {
         Ok(model) => model,
@@ -888,7 +894,7 @@ pub async fn fetch_models(app: AppHandle) -> Result<Vec<Model>, String> {
     let client = reqwest::Client::new();
     let url = format!("{}/api/models", app_endpoint);
 
-    let response = client
+    let response = match client
         .post(&url)
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", api_access_key))
@@ -896,45 +902,20 @@ pub async fn fetch_models(app: AppHandle) -> Result<Vec<Model>, String> {
         .header("app_version", &app_version)
         .send()
         .await
-        .map_err(|e| {
-            let error_msg = format!("{}", e);
-            if error_msg.contains("url (") {
-                // Remove the URL part from the error message
-                let parts: Vec<&str> = error_msg.split(" for url (").collect();
-                if parts.len() > 1 {
-                    format!("Failed to make models request: {}", parts[0])
-                } else {
-                    format!("Failed to make models request: {}", error_msg)
-                }
-            } else {
-                format!("Failed to make models request: {}", error_msg)
-            }
-        })?;
+    {
+        Ok(resp) => resp,
+        Err(_) => return Ok(vec![]),
+    };
 
     // Check if the response is successful
     if !response.status().is_success() {
-        let status = response.status();
-        let error_text = response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Unknown server error".to_string());
-
-        // Try to parse error as JSON to get a more specific error message
-        if let Ok(error_json) = serde_json::from_str::<serde_json::Value>(&error_text) {
-            if let Some(error_msg) = error_json.get("error").and_then(|e| e.as_str()) {
-                return Err(format!("Server error ({}): {}", status, error_msg));
-            } else if let Some(message) = error_json.get("message").and_then(|m| m.as_str()) {
-                return Err(format!("Server error ({}): {}", status, message));
-            }
-        }
-
-        return Err(format!("Server error ({}): {}", status, error_text));
+        return Ok(vec![]);
     }
 
-    let models_response: ModelsResponse = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse models response: {}", e))?;
+    let models_response: ModelsResponse = match response.json().await {
+        Ok(resp) => resp,
+        Err(_) => return Ok(vec![]),
+    };
 
     Ok(models_response.models)
 }
@@ -942,31 +923,51 @@ pub async fn fetch_models(app: AppHandle) -> Result<Vec<Model>, String> {
 // Fetch Freely Prompts API
 #[tauri::command]
 pub async fn fetch_prompts() -> Result<FreelyPromptsResponse, String> {
-    let app_endpoint = get_app_endpoint()?;
-    let api_access_key = get_api_access_key()?;
+    let app_endpoint = match get_app_endpoint() {
+        Ok(endpoint) => endpoint,
+        Err(_) => {
+            // Return empty response if no endpoint configured
+            return Ok(FreelyPromptsResponse {
+                prompts: vec![],
+                total: 0,
+                last_updated: None,
+            });
+        }
+    };
+
+    let api_access_key = match get_api_access_key() {
+        Ok(key) => key,
+        Err(_) => {
+            // Return empty response if no API key configured
+            return Ok(FreelyPromptsResponse {
+                prompts: vec![],
+                total: 0,
+                last_updated: None,
+            });
+        }
+    };
 
     let client = reqwest::Client::new();
     let url = format!("{}/api/prompts", app_endpoint);
 
-    let response = client
+    let response = match client
         .post(&url)
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", api_access_key))
         .send()
         .await
-        .map_err(|e| {
-            let error_msg = format!("{}", e);
-            if error_msg.contains("url (") {
-                let parts: Vec<&str> = error_msg.split(" for url (").collect();
-                if parts.len() > 1 {
-                    format!("Failed to make prompts request: {}", parts[0])
-                } else {
-                    format!("Failed to make prompts request: {}", error_msg)
-                }
-            } else {
-                format!("Failed to make prompts request: {}", error_msg)
-            }
-        })?;
+    {
+        Ok(resp) => resp,
+        Err(e) => {
+            tracing::warn!("Failed to fetch prompts from server: {}", e);
+            // Return empty response when server is unavailable (offline mode)
+            return Ok(FreelyPromptsResponse {
+                prompts: vec![],
+                total: 0,
+                last_updated: None,
+            });
+        }
+    };
 
     // Check if the response is successful
     if !response.status().is_success() {
@@ -976,21 +977,30 @@ pub async fn fetch_prompts() -> Result<FreelyPromptsResponse, String> {
             .await
             .unwrap_or_else(|_| "Unknown server error".to_string());
 
-        if let Ok(error_json) = serde_json::from_str::<serde_json::Value>(&error_text) {
-            if let Some(error_msg) = error_json.get("error").and_then(|e| e.as_str()) {
-                return Err(format!("Server error ({}): {}", status, error_msg));
-            } else if let Some(message) = error_json.get("message").and_then(|m| m.as_str()) {
-                return Err(format!("Server error ({}): {}", status, message));
-            }
-        }
-
-        return Err(format!("Server error ({}): {}", status, error_text));
+        tracing::warn!("Prompts API returned error status: {}", status);
+        // Return empty response on server error
+        return Ok(FreelyPromptsResponse {
+            prompts: vec![],
+            total: 0,
+            last_updated: None,
+        });
     }
 
-    let prompts_response: FreelyPromptsResponse = response
+    let prompts_response: FreelyPromptsResponse = match response
         .json()
         .await
-        .map_err(|e| format!("Failed to parse prompts response: {}", e))?;
+    {
+        Ok(resp) => resp,
+        Err(e) => {
+            tracing::warn!("Failed to parse prompts response: {}", e);
+            // Return empty response on parse error
+            return Ok(FreelyPromptsResponse {
+                prompts: vec![],
+                total: 0,
+                last_updated: None,
+            });
+        }
+    };
 
     Ok(prompts_response)
 }
