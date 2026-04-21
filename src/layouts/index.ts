@@ -1,3 +1,3 @@
-export * from "./DashboardLayout";
+export * from "./MainLayout";
 export * from "./PageLayout";
 export * from "./ErrorLayout";

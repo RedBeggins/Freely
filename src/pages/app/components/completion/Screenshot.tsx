@@ -25,6 +25,7 @@ export const Screenshot = ({
 
   return (
     <Button
+      variant="frosted"
       size="icon"
       className="cursor-pointer"
       title={

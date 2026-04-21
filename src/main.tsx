@@ -6,8 +6,13 @@ import "./global.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import AppRoutes from "./routes";
 
-const currentWindow = getCurrentWindow();
-const windowLabel = currentWindow.label;
+let windowLabel = "main";
+try {
+  const currentWindow = getCurrentWindow();
+  windowLabel = currentWindow.label;
+} catch (e) {
+  console.log("Not running in Tauri window, fallback to main");
+}
 
 // Render different components based on window label
 if (windowLabel.startsWith("capture-overlay-")) {

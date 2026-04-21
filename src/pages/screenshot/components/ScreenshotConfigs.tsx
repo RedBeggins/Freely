@@ -15,7 +15,6 @@ export const ScreenshotConfigs = ({
   handleScreenshotModeChange,
   handleScreenshotPromptChange,
   handleScreenshotEnabledChange,
-  hasActiveLicense,
 }: UseSettingsReturn) => {
   return (
     <div id="screenshot" className="space-y-3">
@@ -53,15 +52,10 @@ export const ScreenshotConfigs = ({
               </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="selection" disabled={!hasActiveLicense}>
+              <SelectItem value="selection">
                 <div className="flex items-center gap-2">
                   <MousePointer2Icon className="size-4" />
                   <div className="font-medium">Selection Mode</div>
-                  {!hasActiveLicense && (
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
-                      You need an active license to use Selection Mode.
-                    </span>
-                  )}
                 </div>
               </SelectItem>
               <SelectItem value="screenshot" className="flex flex-row gap-2">
@@ -127,7 +121,8 @@ export const ScreenshotConfigs = ({
       {/* Tips */}
       <div className="text-xs text-muted-foreground/70">
         <p>
-          💡 <strong>Tip:</strong>{" "}
+          {" "}
+          <strong>Tip:</strong>{" "}
           {screenshotConfiguration.enabled
             ? "Screenshot mode captures the full screen with one click."
             : "Selection mode lets you choose specific areas to capture."}{" "}

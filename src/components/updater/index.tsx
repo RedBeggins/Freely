@@ -208,6 +208,7 @@ export const Updater = () => {
     <Popover open={isPopoverOpen} onOpenChange={handlePopoverOpenChange}>
       <PopoverTrigger asChild>
         <Button
+          variant="frosted"
           size="icon"
           onClick={handleTriggerClick}
           className="cursor-pointer"
@@ -270,7 +271,7 @@ export const Updater = () => {
             <p className="text-xs text-muted-foreground">
               Having trouble downloading?{" "}
               <a
-                href={"https://pluely.com/downloads?ref=pluely-app"}
+                href={"https://freely.com/downloads?ref=freely-app"}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 hover:text-blue-700 underline inline-flex items-center gap-1"

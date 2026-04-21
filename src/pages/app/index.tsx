@@ -37,7 +37,7 @@ const App = () => {
       }}
     >
       <div
-        className={`w-screen h-screen flex overflow-hidden justify-center items-start ${
+        className={`box-border flex h-screen w-screen items-start justify-center overflow-visible pb-3 ${
           isHidden ? "hidden pointer-events-none" : ""
         }`}
       >

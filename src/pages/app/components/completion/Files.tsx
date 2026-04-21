@@ -33,6 +33,7 @@ export const Files = ({
       <Popover open={isFilesPopoverOpen} onOpenChange={setIsFilesPopoverOpen}>
         <PopoverTrigger asChild>
           <Button
+            variant="frosted"
             size="icon"
             onClick={() => {
               if (attachedFiles.length === 0) {

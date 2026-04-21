@@ -1,12 +1,12 @@
 [package]
-name = "pluely"
+name = "freely"
 version = "0.1.9"
 description = "The Open Source Alternative to Cluely - A lightning-fast, privacy-first AI assistant that works seamlessly during meetings, interviews, and conversations without anyone knowing."
 authors = ["Srikanth Nani <srikanthnani1202@gmail.com>"]
 license = "GPL-3.0"
-repository = "https://github.com/iamsrikanthnani/pluely"
-homepage = "https://github.com/iamsrikanthnani/pluely"
-documentation = "https://github.com/iamsrikanthnani/pluely/wiki"
+repository = "https://github.com/iamsrikanthnani/freely"
+homepage = "https://github.com/iamsrikanthnani/freely"
+documentation = "https://github.com/iamsrikanthnani/freely/wiki"
 readme = "../README.md"
 keywords = ["ai-assistant", "tauri", "desktop-app", "privacy-first", "meeting-assistant"]
 categories = ["gui", "multimedia", "accessibility", "science", "development-tools"]
@@ -18,7 +18,7 @@ edition = "2021"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "pluely_lib"
+name = "freely_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -52,6 +52,8 @@ tauri-plugin-shell = "2.3.1"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 tauri-plugin-posthog = "0.2.4"
 tauri-plugin-machine-uid = "0.1.2"
+window-vibrancy = "0.7.1"
+windows = { version = "0.62.2", features = ["Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi", "Win32_Foundation"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-plugin-macos-permissions = "2"
@@ -60,7 +62,6 @@ tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 wasapi = "0.19.0"
-
 [target.'cfg(target_os = "linux")'.dependencies]
 libpulse-binding = "2.30.1"
 libpulse-simple-binding = "2.29.0"

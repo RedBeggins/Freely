@@ -3,7 +3,7 @@ import { Outlet } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorLayout } from "./ErrorLayout";
 
-export const DashboardLayout = () => {
+export const MainLayout = () => {
   return (
     <ErrorBoundary
       fallbackRender={() => {

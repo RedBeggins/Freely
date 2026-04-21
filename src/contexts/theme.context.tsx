@@ -34,10 +34,7 @@ export function ThemeProvider({
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
   );
-  const [transparency, setTransparency] = useState<number>(() => {
-    const stored = localStorage.getItem(STORAGE_KEYS.TRANSPARENCY);
-    return stored ? parseInt(stored, 10) : 10;
-  });
+  const [transparency, setTransparency] = useState<number>(60);
 
   const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
   const isSystemThemeDark = mediaQuery.matches;
@@ -96,18 +93,10 @@ export function ThemeProvider({
 
     // Apply opacity to CSS variables
     root.style.setProperty("--opacity", opacity.toString());
-
-    // Apply backdrop filter when transparency is active
-    if (transparency > 0) {
-      root.style.setProperty("--backdrop-blur", "blur(12px)");
-    } else {
-      root.style.setProperty("--backdrop-blur", "none");
-    }
   }, [transparency]);
 
-  const onSetTransparency = (transparency: number) => {
-    localStorage.setItem(STORAGE_KEYS.TRANSPARENCY, transparency.toString());
-    setTransparency(transparency);
+  const onSetTransparency = (_transparency: number) => {
+    // transparency is hardcoded
   };
 
   const value = {

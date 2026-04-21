@@ -1,4 +1,4 @@
-// Pluely AI Speech Detection, and capture system audio (speaker output) as a stream of f32 samples.
+// Freely AI Speech Detection, and capture system audio (speaker output) as a stream of f32 samples.
 use crate::speaker::{AudioDevice, SpeakerInput};
 use anyhow::Result;
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
@@ -81,15 +81,6 @@ pub async fn start_system_audio_capture(
 
     let stream = input.stream();
     let sr = stream.sample_rate();
-
-    // Validate sample rate
-    if !(8000..=96000).contains(&sr) {
-        error!("Invalid sample rate: {}", sr);
-        return Err(format!(
-            "Invalid sample rate: {}. Expected 8000-96000 Hz",
-            sr
-        ));
-    }
 
     let app_clone = app.clone();
     let vad_config = state
@@ -418,21 +409,44 @@ fn normalize_audio_level(samples: &[f32], target_rms: f32) -> Vec<f32> {
         .collect()
 }
 
+// Resample audio using linear interpolation
+fn resample(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
+    if from_rate == to_rate {
+        return samples.to_vec();
+    }
+    let ratio = from_rate as f64 / to_rate as f64;
+    let out_len = (samples.len() as f64 / ratio).ceil() as usize;
+    let mut out = Vec::with_capacity(out_len);
+    for i in 0..out_len {
+        let pos = i as f64 * ratio;
+        let idx = pos as usize;
+        let frac = (pos - idx as f64) as f32;
+        let a = samples.get(idx).copied().unwrap_or(0.0);
+        let b = samples.get(idx + 1).copied().unwrap_or(a);
+        out.push(a + frac * (b - a));
+    }
+    out
+}
+
 // Convert samples to WAV base64 (with proper error handling)
 fn samples_to_wav_b64(sample_rate: u32, mono_f32: &[f32]) -> Result<String, String> {
-    // Validate sample rate
-    if !(8000..=96000).contains(&sample_rate) {
-        error!("Invalid sample rate: {}", sample_rate);
-        return Err(format!(
-            "Invalid sample rate: {}. Expected 8000-96000 Hz",
-            sample_rate
-        ));
-    }
-
     // Validate buffer
     if mono_f32.is_empty() {
         return Err("Empty audio buffer".to_string());
     }
+
+    // Resample to 16000 Hz (Whisper's native rate) if needed
+    const TARGET_RATE: u32 = 16000;
+    let (final_rate, resampled_buf);
+    if sample_rate != TARGET_RATE {
+        resampled_buf = resample(mono_f32, sample_rate, TARGET_RATE);
+        final_rate = TARGET_RATE;
+    } else {
+        resampled_buf = mono_f32.to_vec();
+        final_rate = sample_rate;
+    }
+    let mono_f32 = &resampled_buf;
+    let sample_rate = final_rate;
 
     let mut cursor = Cursor::new(Vec::new());
     let spec = WavSpec {

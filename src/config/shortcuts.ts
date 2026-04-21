@@ -16,15 +16,15 @@ export const DEFAULT_SHORTCUT_ACTIONS: ShortcutAction[] = [
     name: "Toggle Window",
     description: "Show/Hide the main window",
     defaultKey: {
-      macos: "cmd+backslash",
-      windows: "ctrl+backslash",
-      linux: "ctrl+backslash",
+      macos: "cmd+slash",
+      windows: "ctrl+slash",
+      linux: "ctrl+slash",
     },
   },
   {
     id: "focus_input",
     name: "Refocus Input Box",
-    description: "Bring Pluely forward and place the cursor in the input area",
+    description: "Bring Freely forward and place the cursor in the input area",
     defaultKey: {
       macos: "cmd+shift+i",
       windows: "ctrl+shift+i",

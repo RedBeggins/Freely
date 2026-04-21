@@ -1,6 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import {
-  Dashboard,
   App,
   SystemPrompts,
   ViewChat,
@@ -12,15 +11,14 @@ import {
   Chats,
   Responses,
 } from "@/pages";
-import { DashboardLayout } from "@/layouts";
+import { MainLayout } from "@/layouts";
 
 export default function AppRoutes() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<App />} />
-        <Route element={<DashboardLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
+        <Route element={<MainLayout />}>
           <Route path="/chats" element={<Chats />} />
           <Route path="/system-prompts" element={<SystemPrompts />} />
           <Route path="/chats/view/:conversationId" element={<ViewChat />} />

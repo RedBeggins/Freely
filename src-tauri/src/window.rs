@@ -10,7 +10,7 @@ pub fn setup_main_window(app: &mut App) -> Result<(), Box<dyn std::error::Error>
     // Try different possible window labels
     let window = app
         .get_webview_window("main")
-        .or_else(|| app.get_webview_window("pluely"))
+        .or_else(|| app.get_webview_window("freely"))
         .or_else(|| {
             // Get the first window if specific labels don't work
             app.webview_windows().values().next().cloned()
@@ -19,11 +19,21 @@ pub fn setup_main_window(app: &mut App) -> Result<(), Box<dyn std::error::Error>
 
     position_window_top_center(&window, TOP_OFFSET)?;
 
-    // Set window as non-focusable on Windows
-    // #[cfg(target_os = "windows")]
-    // {
-    //     let _ = window.set_focusable(false);
-    // }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = window_vibrancy::apply_vibrancy(
+            &window,
+            window_vibrancy::NSVisualEffectMaterial::HudWindow,
+            None,
+            None,
+        );
+    }
+
+    // On Windows: fully transparent window. CSS pill provides frosted glass look.
+    // Windows DWM cannot clip OS blur (Acrylic/Aero Glass) to a pill shape —
+    // this is a platform-level limitation shared by Electron, Flutter, Qt, WinUI.
+    // The CSS double-layer technique (background source + backdrop-filter pill)
+    // gives the same frosted glass appearance without any corner bleed.
 
     Ok(())
 }
@@ -155,25 +165,27 @@ pub fn create_dashboard_window<R: Runtime>(
 
     #[cfg(target_os = "macos")]
     let base_builder = base_builder
-        .title("Pluely - Dashboard")
+        .title("Freely - Dashboard")
         .center()
         .decorations(true)
         .inner_size(1200.0, 800.0)
         .min_inner_size(800.0, 600.0)
         .hidden_title(true)
         .title_bar_style(tauri::TitleBarStyle::Overlay)
-        .content_protected(true)
+        // TODO: Reactivar content_protected(true) para producción - bloquea capturas de pantalla
+        .content_protected(false)
         .visible(true)
         .traffic_light_position(LogicalPosition::new(14.0, 18.0));
 
     #[cfg(not(target_os = "macos"))]
     let base_builder = base_builder
-        .title("Pluely - Dashboard")
+        .title("Freely - Dashboard")
         .center()
         .decorations(true)
         .inner_size(800.0, 600.0)
         .min_inner_size(800.0, 600.0)
-        .content_protected(true)
+        // TODO: Reactivar content_protected(true) para producción - bloquea capturas de pantalla
+        .content_protected(false)
         .visible(false);
 
     let window = base_builder.build()?;

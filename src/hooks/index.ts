@@ -1,4 +1,5 @@
 export * from "./useVersion";
+export * from "./useDynamicWindowSize";
 export * from "./useCompletion";
 export * from "./useChatCompletion";
 export * from "./useWindow";

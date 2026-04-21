@@ -8,7 +8,7 @@ import {
   saveConversation,
   getConversationById,
   generateConversationTitle,
-  shouldUsePluelyAPI,
+  shouldUseFreelyAPI,
   MESSAGE_ID_OFFSET,
   generateConversationId,
   generateMessageId,
@@ -76,7 +76,22 @@ export const useCompletion = () => {
   const [messageHistoryOpen, setMessageHistoryOpen] = useState(false);
   const [isFilesPopoverOpen, setIsFilesPopoverOpen] = useState(false);
   const [isScreenshotLoading, setIsScreenshotLoading] = useState(false);
-  const [keepEngaged, setKeepEngaged] = useState(false);
+  const [keepEngaged, setKeepEngagedState] = useState(false);
+
+  // Wrapper to sync keepEngaged to localStorage for window resize handling
+  const setKeepEngaged = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
+    setKeepEngagedState((prev) => {
+      const newValue = typeof value === "function" ? value(prev) : value;
+      localStorage.setItem("freely-keep-engaged", JSON.stringify(newValue));
+      // Dispatch storage event for same-window listeners
+      window.dispatchEvent(new StorageEvent("storage", {
+        key: "freely-keep-engaged",
+        newValue: JSON.stringify(newValue),
+      }));
+      return newValue;
+    });
+  }, []);
+
   const inputRef = useRef<HTMLInputElement | null>(null);
   const isProcessingScreenshotRef = useRef(false);
   const screenshotConfigRef = useRef(screenshotConfiguration);
@@ -179,9 +194,9 @@ export const useCompletion = () => {
 
         let fullResponse = "";
 
-        const usePluelyAPI = await shouldUsePluelyAPI();
+        const useFreelyAPI = await shouldUseFreelyAPI();
         // Check if AI provider is configured
-        if (!selectedAIProvider.provider && !usePluelyAPI) {
+        if (!selectedAIProvider.provider && !useFreelyAPI) {
           setState((prev) => ({
             ...prev,
             error: "Please select an AI provider in settings",
@@ -192,7 +207,7 @@ export const useCompletion = () => {
         const provider = allAiProviders.find(
           (p) => p.id === selectedAIProvider.provider
         );
-        if (!provider && !usePluelyAPI) {
+        if (!provider && !useFreelyAPI) {
           setState((prev) => ({
             ...prev,
             error: "Invalid provider selected",
@@ -211,7 +226,7 @@ export const useCompletion = () => {
         try {
           // Use the fetchAIResponse function with signal
           for await (const chunk of fetchAIResponse({
-            provider: usePluelyAPI ? undefined : provider,
+            provider: useFreelyAPI ? undefined : provider,
             selectedProvider: selectedAIProvider,
             systemPrompt: systemPrompt || undefined,
             history: messageHistory,
@@ -488,7 +503,7 @@ export const useCompletion = () => {
     };
 
     const handleStorageChange = async (e: StorageEvent) => {
-      if (e.key === "pluely-conversation-selected" && e.newValue) {
+      if (e.key === "freely-conversation-selected" && e.newValue) {
         try {
           const data = JSON.parse(e.newValue);
           const { id } = data;
@@ -582,9 +597,9 @@ export const useCompletion = () => {
 
             let fullResponse = "";
 
-            const usePluelyAPI = await shouldUsePluelyAPI();
+            const useFreelyAPI = await shouldUseFreelyAPI();
             // Check if AI provider is configured
-            if (!selectedAIProvider.provider && !usePluelyAPI) {
+            if (!selectedAIProvider.provider && !useFreelyAPI) {
               setState((prev) => ({
                 ...prev,
                 error: "Please select an AI provider in settings",
@@ -595,7 +610,7 @@ export const useCompletion = () => {
             const provider = allAiProviders.find(
               (p) => p.id === selectedAIProvider.provider
             );
-            if (!provider && !usePluelyAPI) {
+            if (!provider && !useFreelyAPI) {
               setState((prev) => ({
                 ...prev,
                 error: "Invalid provider selected",
@@ -614,7 +629,7 @@ export const useCompletion = () => {
 
             // Use the fetchAIResponse function with image and signal
             for await (const chunk of fetchAIResponse({
-              provider: usePluelyAPI ? undefined : provider,
+              provider: useFreelyAPI ? undefined : provider,
               selectedProvider: selectedAIProvider,
               systemPrompt: systemPrompt || undefined,
               history: messageHistory,
@@ -876,7 +891,7 @@ export const useCompletion = () => {
             setState((prev) => ({
               ...prev,
               error:
-                "Screen Recording permission required. Please enable it by going to System Settings > Privacy & Security > Screen & System Audio Recording. If you don't see Pluely in the list, click the '+' button to add it. If it's already listed, make sure it's enabled. Then restart the app.",
+                "Screen Recording permission required. Please enable it by going to System Settings > Privacy & Security > Screen & System Audio Recording. If you don't see Freely in the list, click the '+' button to add it. If it's already listed, make sure it's enabled. Then restart the app.",
             }));
             setIsScreenshotLoading(false);
             screenshotInitiatedByThisContext.current = false;
@@ -1003,6 +1018,20 @@ export const useCompletion = () => {
     captureScreenshot,
     inputRef,
   ]);
+
+  // Listen for ask-triggered event (from TopBar or shortcut)
+  useEffect(() => {
+    const handler = () => {
+      captureScreenshot();
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 100);
+    };
+    window.addEventListener("ask-triggered", handler);
+    return () => window.removeEventListener("ask-triggered", handler);
+  }, [captureScreenshot]);
 
   return {
     input: state.input,

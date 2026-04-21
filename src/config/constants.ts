@@ -2,6 +2,7 @@
 export const STORAGE_KEYS = {
   THEME: "theme",
   TRANSPARENCY: "transparency",
+  BLUR: "blur",
   SYSTEM_PROMPT: "system_prompt",
   SELECTED_SYSTEM_PROMPT_ID: "selected_system_prompt_id",
   SCREENSHOT_CONFIG: "screenshot_config",
@@ -13,7 +14,7 @@ export const STORAGE_KEYS = {
   SYSTEM_AUDIO_CONTEXT: "system_audio_context",
   SYSTEM_AUDIO_QUICK_ACTIONS: "system_audio_quick_actions",
   CUSTOMIZABLE: "customizable",
-  PLUELY_API_ENABLED: "pluely_api_enabled",
+  FREELY_API_ENABLED: "freely_api_enabled",
   SHORTCUTS: "shortcuts",
   AUTOSTART_INITIALIZED: "autostart_initialized",
 

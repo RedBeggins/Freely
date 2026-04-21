@@ -7,29 +7,22 @@ import {
   CardTitle,
   Header,
   Empty,
-  GetLicense,
 } from "@/components";
-import {
-  CheckCircle2,
-  Sparkles,
-  BotIcon,
-  LockIcon,
-  ClockIcon,
-} from "lucide-react";
+import { CheckCircle2, Sparkles, BotIcon, ClockIcon } from "lucide-react";
 import { useApp } from "@/contexts";
 import { safeLocalStorage } from "@/lib";
 import { STORAGE_KEYS } from "@/config";
 import moment from "moment";
 
-interface PluelyPrompt {
+interface FreelyPrompt {
   title: string;
   prompt: string;
   modelId: string;
   modelName: string;
 }
 
-interface PluelyPromptsResponse {
-  prompts: PluelyPrompt[];
+interface FreelyPromptsResponse {
+  prompts: FreelyPrompt[];
   total: number;
   last_updated?: string;
 }
@@ -44,55 +37,47 @@ interface Model {
   isAvailable: boolean;
 }
 
-const SELECTED_PLUELY_MODEL_STORAGE_KEY = "selected_pluely_model";
-const SELECTED_PLUELY_PROMPT_STORAGE_KEY = "selected_pluely_prompt";
+const SELECTED_FREELY_MODEL_STORAGE_KEY = "selected_freely_model";
+const SELECTED_FREELY_PROMPT_STORAGE_KEY = "selected_freely_prompt";
 
-export const PluelyPrompts = () => {
-  const {
-    setSystemPrompt,
-    hasActiveLicense,
-    setSupportsImages,
-    pluelyApiEnabled,
-  } = useApp();
-  const [prompts, setPrompts] = useState<PluelyPrompt[]>([]);
+export const FreelyPrompts = () => {
+  const { setSystemPrompt, setSupportsImages } = useApp();
+  const [prompts, setPrompts] = useState<FreelyPrompt[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [selectedPluelyPrompt, setSelectedPluelyPrompt] =
-    useState<PluelyPrompt | null>(() => {
-      // Load selected prompt from local storage on initial render
-      const stored = safeLocalStorage.getItem(
-        SELECTED_PLUELY_PROMPT_STORAGE_KEY
-      );
-      if (stored) {
-        try {
-          return JSON.parse(stored);
-        } catch {
-          return null;
-        }
+  const [selectedFreelyPrompt, setSelectedFreelyPrompt] = useState<FreelyPrompt | null>(() => {
+    // Load selected prompt from local storage on initial render
+    const stored = safeLocalStorage.getItem(SELECTED_FREELY_PROMPT_STORAGE_KEY);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return null;
       }
-      return null;
-    });
+    }
+    return null;
+  });
   const [models, setModels] = useState<Model[]>([]);
   const fetchInitiated = useRef(false);
 
   useEffect(() => {
     if (!fetchInitiated.current) {
       fetchInitiated.current = true;
-      fetchPluelyPrompts();
+      fetchFreelyPrompts();
       fetchModels();
     }
   }, []);
 
-  // Watch for changes in user's selected prompt and clear Pluely selection if needed
+  // Watch for changes in user's selected prompt and clear Freely selection if needed
   useEffect(() => {
     const checkUserPromptSelection = () => {
       const userSelectedPromptId = safeLocalStorage.getItem(
         STORAGE_KEYS.SELECTED_SYSTEM_PROMPT_ID
       );
-      // If user has selected one of their own prompts, clear Pluely prompt selection
+      // If user has selected one of their own prompts, clear Freely prompt selection
       if (userSelectedPromptId) {
-        setSelectedPluelyPrompt(null);
+        setSelectedFreelyPrompt(null);
       }
     };
 
@@ -105,24 +90,23 @@ export const PluelyPrompts = () => {
         checkUserPromptSelection();
       }
     };
-
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
-  const fetchPluelyPrompts = async () => {
+  const fetchFreelyPrompts = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await invoke<PluelyPromptsResponse>("fetch_prompts");
+      const response = await invoke<FreelyPromptsResponse>("fetch_prompts");
       setPrompts(response.prompts);
       if (response.last_updated) {
         setLastUpdated(response.last_updated);
       }
     } catch (err) {
-      console.error("Failed to fetch Pluely prompts:", err);
+      console.error("Failed to fetch Freely prompts:", err);
       setError(
-        typeof err === "string" ? err : "Failed to fetch Pluely prompts"
+        typeof err === "string" ? err : "Failed to fetch Freely prompts"
       );
     } finally {
       setIsLoading(false);
@@ -138,16 +122,11 @@ export const PluelyPrompts = () => {
     }
   };
 
-  const handleSelectPluelyPrompt = async (prompt: PluelyPrompt) => {
-    // Check if user has active license
-    if (!hasActiveLicense) {
-      return;
-    }
-
+  const handleSelectFreelyPrompt = async (prompt: FreelyPrompt) => {
     try {
       // Set the system prompt
       setSystemPrompt(prompt.prompt);
-      setSelectedPluelyPrompt(prompt);
+      setSelectedFreelyPrompt(prompt);
 
       // Clear the user's selected prompt ID from local storage
       // This ensures the user prompt cards don't show as selected
@@ -156,47 +135,44 @@ export const PluelyPrompts = () => {
       // Save the system prompt to local storage
       safeLocalStorage.setItem(STORAGE_KEYS.SYSTEM_PROMPT, prompt.prompt);
 
-      // Save the selected Pluely prompt to local storage for persistence
+      // Save the selected Freely prompt to local storage for persistence
       safeLocalStorage.setItem(
-        SELECTED_PLUELY_PROMPT_STORAGE_KEY,
+        SELECTED_FREELY_PROMPT_STORAGE_KEY,
         JSON.stringify(prompt)
       );
 
       // Find the model by modelId and select it
       const matchingModel = models.find(
-        (model) => model.model === prompt.modelId || model.id === prompt.modelId
+        (model) =>
+          model.model === prompt.modelId || model.id === prompt.modelId
       );
-
       if (matchingModel) {
         // Update supportsImages based on model modality
-        if (pluelyApiEnabled) {
-          const hasImageSupport =
-            matchingModel.modality?.includes("image") ?? false;
-          setSupportsImages(hasImageSupport);
-        }
-
+        const hasImageSupport =
+          matchingModel.modality?.includes("image") ?? false;
+        setSupportsImages(hasImageSupport);
         await invoke("secure_storage_save", {
           items: [
             {
-              key: SELECTED_PLUELY_MODEL_STORAGE_KEY,
+              key: SELECTED_FREELY_MODEL_STORAGE_KEY,
               value: JSON.stringify(matchingModel),
             },
           ],
         });
       }
     } catch (error) {
-      console.error("Failed to select Pluely prompt:", error);
+      console.error("Failed to select Freely prompt:", error);
     }
   };
 
-  const handleCardClick = (prompt: PluelyPrompt) => {
-    handleSelectPluelyPrompt(prompt);
+  const handleCardClick = (prompt: FreelyPrompt) => {
+    handleSelectFreelyPrompt(prompt);
   };
 
-  const isPromptSelected = (prompt: PluelyPrompt) => {
+  const isPromptSelected = (prompt: FreelyPrompt) => {
     return (
-      selectedPluelyPrompt?.title === prompt.title &&
-      selectedPluelyPrompt?.modelId === prompt.modelId
+      selectedFreelyPrompt?.title === prompt.title &&
+      selectedFreelyPrompt?.modelId === prompt.modelId
     );
   };
 
@@ -204,14 +180,14 @@ export const PluelyPrompts = () => {
     return (
       <div className="space-y-4 mt-6">
         <Header
-          title="Pluely Default Prompts"
+          title="Freely Default Prompts"
           description="Pre-configured prompts with optimal model selection"
         />
         <Empty
           isLoading={true}
           icon={Sparkles}
           title="Loading prompts..."
-          description="Fetching Pluely default prompts"
+          description="Fetching Freely default prompts"
         />
       </div>
     );
@@ -221,7 +197,7 @@ export const PluelyPrompts = () => {
     return (
       <div className="space-y-4 mt-6">
         <Header
-          title="Pluely Default Prompts"
+          title="Freely Default Prompts"
           description="Pre-configured prompts with optimal model selection"
         />
         <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3">
@@ -241,7 +217,7 @@ export const PluelyPrompts = () => {
         <div className="flex items-start gap-3 w-full">
           <div className="flex flex-col gap-1 w-full">
             <Header
-              title="Pluely Default Prompts"
+              title="Freely Default Prompts"
               description="Pre-configured prompts with optimal model pairings. Selecting a prompt will automatically set the recommended AI model for best results."
             />
             {lastUpdated && (
@@ -252,24 +228,15 @@ export const PluelyPrompts = () => {
             )}
           </div>
         </div>
-        {!hasActiveLicense && (
-          <GetLicense buttonText="Unlock" buttonClassName="shrink-0" />
-        )}
       </div>
 
-      <div
-        className={`grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 pb-4 ${
-          !hasActiveLicense ? "opacity-60" : ""
-        }`}
-      >
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 pb-4">
         {prompts.map((prompt, index) => {
           const isSelected = isPromptSelected(prompt);
           return (
             <Card
               key={`${prompt.title}-${index}`}
-              className={`relative border lg:border-2 shadow-none p-4 pb-10 gap-0 group transition-all hover:shadow-sm ${
-                hasActiveLicense ? "cursor-pointer" : "cursor-not-allowed"
-              } ${
+              className={`relative border lg:border-2 shadow-none p-4 pb-10 gap-0 group transition-all hover:shadow-sm cursor-pointer ${
                 isSelected
                   ? "!bg-primary/5 dark:!bg-primary/10 border-primary"
                   : "!bg-black/5 dark:!bg-white/5 border-transparent"
@@ -279,9 +246,7 @@ export const PluelyPrompts = () => {
               {isSelected && (
                 <CheckCircle2 className="size-5 text-green-500 flex-shrink-0 absolute top-2 right-2" />
               )}
-              {!hasActiveLicense && (
-                <LockIcon className="size-4 text-muted-foreground flex-shrink-0 absolute top-2 right-2" />
-              )}
+
               <CardHeader className="p-0 pb-0 select-none">
                 <div className="flex items-start justify-between gap-2 relative">
                   <div className="flex-1 space-y-1.5">

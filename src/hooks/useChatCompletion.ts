@@ -6,7 +6,7 @@ import {
   saveConversation,
   getConversationById,
   generateConversationTitle,
-  shouldUsePluelyAPI,
+  shouldUseFreelyAPI,
   MESSAGE_ID_OFFSET,
   generateMessageId,
   generateRequestId,
@@ -60,7 +60,6 @@ export const useChatCompletion = (
     selectedSttProvider,
     allSttProviders,
     selectedAudioDevices,
-    hasActiveLicense,
   } = useApp();
 
   const [state, setState] = useState<ChatCompletionState>({
@@ -109,7 +108,6 @@ export const useChatCompletion = (
         base64,
         size: file.size,
       };
-
       setState((prev) => ({
         ...prev,
         attachedFiles: [...prev.attachedFiles, attachedFile],
@@ -133,7 +131,6 @@ export const useChatCompletion = (
   const submit = useCallback(
     async (speechText?: string) => {
       const input = speechText || state.input;
-
       if (!input.trim()) {
         return;
       }
@@ -153,7 +150,6 @@ export const useChatCompletion = (
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-
       abortControllerRef.current = new AbortController();
       const signal = abortControllerRef.current.signal;
 
@@ -174,9 +170,10 @@ export const useChatCompletion = (
           });
         }
 
-        const usePluelyAPI = await shouldUsePluelyAPI();
+        const useFreelyAPI = await shouldUseFreelyAPI();
+
         // Check if AI provider is configured
-        if (!selectedAIProvider.provider && !usePluelyAPI) {
+        if (!selectedAIProvider.provider && !useFreelyAPI) {
           setState((prev) => ({
             ...prev,
             error: "Please select an AI provider in settings",
@@ -187,7 +184,8 @@ export const useChatCompletion = (
         const provider = allAiProviders.find(
           (p) => p.id === selectedAIProvider.provider
         );
-        if (!provider && !usePluelyAPI) {
+
+        if (!provider && !useFreelyAPI) {
           setState((prev) => ({
             ...prev,
             error: "Invalid provider selected",
@@ -225,9 +223,9 @@ export const useChatCompletion = (
         let fullResponse = "";
 
         try {
-          // Use the fetchAIResponse function with signal
+          // Use the fetchAIResponse function with signal for
           for await (const chunk of fetchAIResponse({
-            provider: usePluelyAPI ? undefined : provider,
+            provider: useFreelyAPI ? undefined : provider,
             selectedProvider: selectedAIProvider,
             systemPrompt: systemPrompt || undefined,
             history: messageHistory,
@@ -261,10 +259,9 @@ export const useChatCompletion = (
             };
 
             // Check if assistant message already exists
-            const lastMessage =
-              updatedWithResponse.messages[
-                updatedWithResponse.messages.length - 1
-              ];
+            const lastMessage = updatedWithResponse.messages[
+              updatedWithResponse.messages.length - 1
+            ];
             if (lastMessage.role === "assistant") {
               // Update existing assistant message
               updatedWithResponse.messages[
@@ -274,7 +271,6 @@ export const useChatCompletion = (
               // Add new assistant message
               updatedWithResponse.messages.push(assistantMsg);
             }
-
             setMessages(updatedWithResponse);
 
             // Auto-scroll during streaming
@@ -410,7 +406,6 @@ export const useChatCompletion = (
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-
     files.forEach((file) => {
       if (
         file.type.startsWith("image/") &&
@@ -419,7 +414,6 @@ export const useChatCompletion = (
         addFile(file);
       }
     });
-
     // Reset input so same file can be selected again
     e.target.value = "";
   };
@@ -473,10 +467,7 @@ export const useChatCompletion = (
         console.error("Failed to process screenshot:", error);
         setState((prev) => ({
           ...prev,
-          error:
-            error instanceof Error
-              ? error.message
-              : "An error occurred processing screenshot",
+          error: error instanceof Error ? error.message : "An error occurred processing screenshot",
           isLoading: false,
         }));
       }
@@ -511,9 +502,7 @@ export const useChatCompletion = (
       // If we have images, prevent default text pasting and process images
       if (hasImages) {
         e.preventDefault();
-
         const processedFiles: File[] = [];
-
         Array.from(items).forEach((item) => {
           if (
             item.type.startsWith("image/") &&
@@ -535,12 +524,9 @@ export const useChatCompletion = (
 
   const captureScreenshot = useCallback(async () => {
     if (!handleScreenshotSubmit) return;
-
     const config = screenshotConfigRef.current;
-
     // Mark that this context initiated the screenshot
     screenshotInitiatedByThisContext.current = true;
-
     setIsScreenshotLoading(true);
 
     try {
@@ -553,21 +539,16 @@ export const useChatCompletion = (
         } = await import("tauri-plugin-macos-permissions-api");
 
         const hasPermission = await checkScreenRecordingPermission();
-
         if (!hasPermission) {
           // Request permission
           await requestScreenRecordingPermission();
-
           // Wait a moment and check again
           await new Promise((resolve) => setTimeout(resolve, 2000));
-
           const hasPermissionNow = await checkScreenRecordingPermission();
-
           if (!hasPermissionNow) {
             setState((prev) => ({
               ...prev,
-              error:
-                "Screen Recording permission required. Please enable it by going to System Settings > Privacy & Security > Screen & System Audio Recording. If you don't see Pluely in the list, click the '+' button to add it. If it's already listed, make sure it's enabled. Then restart the app.",
+              error: "Screen Recording permission required. Please enable it by going to System Settings > Privacy & Security > Screen & System Audio Recording. If you don't see Freely in the list, click the '+' button to add it. If it's already listed, make sure it's enabled. Then restart the app.",
             }));
             setIsScreenshotLoading(false);
             screenshotInitiatedByThisContext.current = false;
@@ -579,7 +560,6 @@ export const useChatCompletion = (
 
       if (config.enabled) {
         const base64 = await invoke("capture_to_base64");
-
         if (config.mode === "auto") {
           // Auto mode: Submit directly to AI with the configured prompt
           await handleScreenshotSubmit(base64 as string, config.autoPrompt);
@@ -591,16 +571,6 @@ export const useChatCompletion = (
         screenshotInitiatedByThisContext.current = false;
       } else {
         // Selection Mode: Open overlay to select an area
-        // Only allow if user has active license
-        if (!hasActiveLicense) {
-          setState((prev) => ({
-            ...prev,
-            error: "Selection mode requires an active license",
-          }));
-          setIsScreenshotLoading(false);
-          screenshotInitiatedByThisContext.current = false;
-          return;
-        }
         isProcessingScreenshotRef.current = false;
         await invoke("start_screen_capture");
       }
@@ -616,11 +586,10 @@ export const useChatCompletion = (
         setIsScreenshotLoading(false);
       }
     }
-  }, [handleScreenshotSubmit, hasActiveLicense]);
+  }, [handleScreenshotSubmit]);
 
   useEffect(() => {
     let unlisten: any;
-
     const setupListener = async () => {
       unlisten = await listen("captured-selection", async (event: any) => {
         // Only process if this context initiated the screenshot
@@ -657,7 +626,6 @@ export const useChatCompletion = (
     };
 
     setupListener();
-
     return () => {
       if (unlisten) {
         unlisten();
@@ -671,7 +639,6 @@ export const useChatCompletion = (
       isProcessingScreenshotRef.current = false;
       screenshotInitiatedByThisContext.current = false;
     });
-
     return () => {
       unlisten.then((fn) => fn());
     };
@@ -720,6 +687,5 @@ export const useChatCompletion = (
     selectedSttProvider,
     allSttProviders,
     selectedAudioDevices,
-    hasActiveLicense,
   };
 };

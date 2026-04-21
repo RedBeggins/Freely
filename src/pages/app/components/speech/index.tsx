@@ -65,7 +65,7 @@ export const SystemAudio = (props: useSystemAudioType) => {
     scrollAreaRef,
   } = props;
 
-  const { hasActiveLicense, supportsImages } = useApp();
+  const { supportsImages } = useApp();
 
   // View mode toggle
   const [conversationMode, setConversationMode] = useState(false);
@@ -184,6 +184,7 @@ export const SystemAudio = (props: useSystemAudioType) => {
     >
       <PopoverTrigger asChild>
         <Button
+          variant="frosted"
           size="icon"
           title={getButtonTitle()}
           onClick={handleToggleCapture}
@@ -226,10 +227,10 @@ export const SystemAudio = (props: useSystemAudioType) => {
                 {/* Action Buttons */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   {/* Screenshot Button */}
-                  {hasActiveLicense && !setupRequired && supportsImages && (
+                  {!setupRequired && supportsImages && (
                     <Button
+                      variant={screenshotImage ? "default" : "frosted"}
                       size="sm"
-                      variant={screenshotImage ? "default" : "outline"}
                       onClick={handleCaptureScreenshot}
                       disabled={isCapturingScreenshot}
                       className={cn(
@@ -250,8 +251,8 @@ export const SystemAudio = (props: useSystemAudioType) => {
                   {/* New Conversation Button */}
                   {!setupRequired && (
                     <Button
+                      variant="frosted"
                       size="sm"
-                      variant="ghost"
                       onClick={startNewConversation}
                       className="h-6 text-[10px] gap-1 px-2"
                       title="Start a new conversation"
@@ -264,8 +265,8 @@ export const SystemAudio = (props: useSystemAudioType) => {
                   {/* Close Button */}
                   {!capturing && (
                     <Button
+                      variant="frosted"
                       size="icon"
-                      variant="ghost"
                       className="h-6 w-6"
                       title="Close"
                       onClick={() => {

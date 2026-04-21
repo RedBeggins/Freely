@@ -126,8 +126,8 @@ export const Input = ({
               </div>
               <CopyButton content={response} />
               <Button
+                variant="frosted"
                 size="icon"
-                variant="ghost"
                 onClick={() => {
                   if (isLoading) {
                     cancel();

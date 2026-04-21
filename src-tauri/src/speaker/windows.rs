@@ -1,4 +1,4 @@
-// Pluely windows speaker input and stream
+// Freely windows speaker input and stream
 use super::AudioDevice;
 use anyhow::Result;
 use futures_util::Stream;
@@ -94,9 +94,6 @@ fn find_device_by_id(direction: &Direction, device_id: &str) -> Option<wasapi::D
         if let Ok(device) = collection.get_device_at_index(i) {
             if let Ok(id) = device.get_id() {
                 if id == device_id {
-                    let name = device
-                        .get_friendlyname()
-                        .unwrap_or_else(|_| "Unknown".to_string());
                     return Some(device);
                 }
             }
@@ -139,18 +136,18 @@ impl SpeakerInput {
             if let Err(e) =
                 SpeakerStream::capture_audio_loop(queue_clone, waker_clone, init_tx, device_id)
             {
-                error!("Pluely Audio capture loop failed: {}", e);
+                error!("Freely Audio capture loop failed: {}", e);
             }
         });
 
         let actual_sample_rate = match init_rx.recv_timeout(Duration::from_secs(5)) {
             Ok(Ok(rate)) => rate,
             Ok(Err(e)) => {
-                error!("Pluely Audio initialization failed: {}", e);
+                error!("Freely Audio initialization failed: {}", e);
                 44100
             }
             Err(_) => {
-                error!("Pluely Audio initialization timeout");
+                error!("Freely Audio initialization timeout");
                 44100
             }
         };
@@ -192,9 +189,6 @@ impl SpeakerStream {
             let device = match device_id {
                 Some(ref id) => match find_device_by_id(&Direction::Render, id) {
                     Some(d) => {
-                        let name = d
-                            .get_friendlyname()
-                            .unwrap_or_else(|_| "Unknown".to_string());
                         d
                     }
                     None => {
@@ -204,7 +198,7 @@ impl SpeakerStream {
                 None => get_default_device(&Direction::Render)?,
             };
 
-            let device_name = device
+            let _device_name = device
                 .get_friendlyname()
                 .unwrap_or_else(|_| "Unknown".to_string());
 
@@ -246,13 +240,13 @@ impl SpeakerStream {
                     }
 
                     if h_event.wait_for_event(3000).is_err() {
-                        error!("Pluely timeout error, stopping capture");
+                        error!("Freely timeout error, stopping capture");
                         break;
                     }
 
                     let mut temp_queue = VecDeque::new();
                     if let Err(e) = render_client.read_from_device_to_deque(&mut temp_queue) {
-                        error!("Pluely Failed to read audio data: {}", e);
+                        error!("Freely Failed to read audio data: {}", e);
                         continue;
                     }
 

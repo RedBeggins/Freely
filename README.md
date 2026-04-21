@@ -540,3 +540,15 @@ This project is licensed under the **GNU General Public License v3.0** - see the
 **Made with ❤️ by [Srikanth Nani](https://www.srikanthnani.com/)**
 
 _Experience the power of Cluely, but with complete transparency and control over your data._
+
+
+Las capturas de pantalla ya están habilitadas para debugging. He verificado los cambios:
+
+1. __tauri.conf.json__ (línea 27): `"contentProtected": false` - permite capturas
+
+2. __src-tauri/src/window.rs__:
+
+   - Líneas 175-176: Comentario `// TODO: Reactivar content_protected(true) para producción - bloquea capturas de pantalla` y `.content_protected(false)` para macOS
+   - Líneas 187-188: Mismo comentario y `.content_protected(false)` para Windows
+
+Los comentarios claros indican que para volver a deshabilitarlas en producción, simplemente hay que cambiar `content_protected(false)` a `content_protected(true)` en ambas secciones del archivo y también cambiar `"contentProtected": false` a `true` en tauri.conf.json.

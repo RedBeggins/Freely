@@ -15,11 +15,12 @@ export const useWindowResize = () => {
     try {
       const window = getCurrentWebviewWindow();
 
+      // Don't resize to collapsed if popover/chat is open
       if (!expanded && isAnyPopoverOpen()) {
         return;
       }
 
-      const newHeight = expanded ? 600 : 54;
+      const newHeight = expanded ? 600 : 56;
 
       await invoke("set_window_height", {
         window,
@@ -40,18 +41,17 @@ export const useWindowResize = () => {
 
       if (isDragRegion) {
         isDragging = true;
+        // Close immediately on mouse down so it hides during the drag 
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
       }
     };
 
     const handleMouseUp = async () => {
       if (isDragging) {
         isDragging = false;
-
         setTimeout(() => {
-          if (!isAnyPopoverOpen()) {
-            resizeWindow(false);
-          }
-        }, 100);
+          resizeWindow(false);
+        }, 150);
       }
     };
 

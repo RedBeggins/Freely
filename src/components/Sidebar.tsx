@@ -15,15 +15,15 @@ export const Sidebar = () => {
     <aside className="flex w-56 flex-col select-none pt-2">
       {/* Logo */}
       <div
-        onClick={() => navigate("/dashboard")}
-        className="flex h-16 items-center px-4 pt-10 gap-1.5"
+        onClick={() => navigate("/chats")}
+        className="flex h-16 items-center px-4 pt-10 gap-1.5 cursor-pointer"
       >
         <div className="flex size-6 lg:size-7 items-center justify-center rounded-lg bg-primary">
           <SparklesIcon className="size-4 lg:size-5 text-primary-foreground transition-all duration-300" />
         </div>
         <div className="flex flex-col">
           <h1 className="text-xs lg:text-md font-semibold text-foreground transition-all duration-300">
-            Pluely
+            Freely
           </h1>
           <span className="text-[8px] lg:text-[10px] text-muted-foreground -mt-1 block">
             {isLoading ? "Loading..." : `(v${version})`}
@@ -48,11 +48,6 @@ export const Sidebar = () => {
               <item.icon className="size-3 lg:size-4 transition-all duration-300" />
               {item.label}
             </div>
-            {item.count ? (
-              <span className="flex size-5 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
-                {item.count}
-              </span>
-            ) : null}
           </button>
         ))}
       </nav>
@@ -75,7 +70,6 @@ export const Sidebar = () => {
         {footerItems.map((item, index) => (
           <a
             href={item.href}
-            onClick={item.action}
             target="_blank"
             rel="noopener noreferrer"
             key={`${item.label}-${index}`}

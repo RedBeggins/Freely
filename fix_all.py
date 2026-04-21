@@ -1,0 +1,11 @@
+import re 
+with open('src/hooks/useMenuItems.tsx','r') as f: content=f.read() 
+content=re.sub(r'HomeIcon,\r?\n','',content) 
+content=re.sub(r'CoffeeIcon,\r?\n','',content) 
+content=re.sub(r'XIcon, ','',content) 
+content=re.sub(r'import \{ useApp \} from "@/contexts";\r?\n','',content) 
+content=re.sub(r'const \{ hasActiveLicense \} = useApp\(\);\r?\n\r?\n','',content) 
+content=re.sub(r'\.\.\.\(hasActiveLicense\s*\?\s*\[','[',content) 
+content=re.sub(r'\s*\]:\s*\[\]\),',',',content) 
+with open('src/hooks/useMenuItems.tsx','w') as f: f.write(content) 
+print('Fixed useMenuItems.tsx')

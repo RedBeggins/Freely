@@ -6,7 +6,7 @@ mod db;
 mod shortcuts;
 mod window;
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Manager, WebviewWindow};
+    use tauri::Manager;
 use tauri_plugin_posthog::{init as posthog_init, PostHogConfig, PostHogOptions};
 use tokio::task::JoinHandle;
 mod speaker;
@@ -33,7 +33,7 @@ fn get_app_version() -> String {
 pub fn run() {
     // Get PostHog API key
     let posthog_api_key = option_env!("POSTHOG_API_KEY").unwrap_or("").to_string();
-    let mut builder = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:pluely.db", db::migrations())
@@ -44,9 +44,8 @@ pub fn run() {
         .manage(shortcuts::WindowVisibility {
             is_hidden: Mutex::new(false),
         })
-        .manage(shortcuts::RegisteredShortcuts::default())
-        .manage(shortcuts::LicenseState::default())
-        .manage(shortcuts::MoveWindowState::default())
+    .manage(shortcuts::RegisteredShortcuts::default())
+    .manage(shortcuts::MoveWindowState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_http::init())
@@ -70,7 +69,7 @@ pub fn run() {
     {
         builder = builder.plugin(tauri_nspanel::init());
     }
-    let mut builder = builder
+    let builder = builder
         .invoke_handler(tauri::generate_handler![
             get_app_version,
             window::set_window_height,
@@ -84,16 +83,10 @@ pub fn run() {
             shortcuts::check_shortcuts_registered,
             shortcuts::get_registered_shortcuts,
             shortcuts::update_shortcuts,
-            shortcuts::validate_shortcut_key,
-            shortcuts::set_license_status,
+    shortcuts::validate_shortcut_key,
             shortcuts::set_app_icon_visibility,
             shortcuts::set_always_on_top,
             shortcuts::exit_app,
-            activate::activate_license_api,
-            activate::deactivate_license_api,
-            activate::validate_license_api,
-            activate::mask_license_key_cmd,
-            activate::get_checkout_url,
             activate::secure_storage_save,
             activate::secure_storage_get,
             activate::secure_storage_remove,
@@ -102,8 +95,6 @@ pub fn run() {
             api::fetch_models,
             api::fetch_prompts,
             api::create_system_prompt,
-            api::check_license_status,
-            api::get_activity,
             speaker::start_system_audio_capture,
             speaker::stop_system_audio_capture,
             speaker::manual_stop_continuous,

@@ -1,4 +1,4 @@
-use base64::{engine::general_purpose, Engine as _};
+﻿use base64::{engine::general_purpose, Engine as _};
 use futures_util::StreamExt;
 use reqwest::multipart::{Form, Part};
 use reqwest::Url;
@@ -46,38 +46,27 @@ fn get_secure_storage_path(app: &AppHandle) -> Result<PathBuf, String> {
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct SecureStorage {
-    license_key: Option<String>,
-    instance_id: Option<String>,
-    selected_pluely_model: Option<String>,
+    selected_freely_model: Option<String>,
 }
 
 pub async fn get_stored_credentials(
     app: &AppHandle,
-) -> Result<(String, String, Option<Model>), String> {
+) -> Result<Option<Model>, String> {
     let storage_path = get_secure_storage_path(app)?;
 
-    if !storage_path.exists() {
-        return Err("No license found. Please activate your license first.".to_string());
+    let mut selected_model: Option<Model> = None;
+
+    if storage_path.exists() {
+        if let Ok(content) = fs::read_to_string(&storage_path) {
+            if let Ok(storage) = serde_json::from_str::<SecureStorage>(&content) {
+                selected_model = storage
+                .selected_freely_model
+                .and_then(|json_str| serde_json::from_str(&json_str).ok());
+            }
+        }
     }
 
-    let content = fs::read_to_string(&storage_path)
-        .map_err(|e| format!("Failed to read storage file: {}", e))?;
-
-    let storage: SecureStorage = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse storage file: {}", e))?;
-
-    let license_key = storage
-        .license_key
-        .ok_or("License key not found".to_string())?;
-    let instance_id = storage
-        .instance_id
-        .ok_or("Instance ID not found".to_string())?;
-
-    let selected_model: Option<Model> = storage
-        .selected_pluely_model
-        .and_then(|json_str| serde_json::from_str(&json_str).ok());
-
-    Ok((license_key, instance_id, selected_model))
+    Ok(selected_model)
 }
 
 // Audio API Structs
@@ -90,6 +79,7 @@ pub struct AudioResponse {
 
 // Chat API Structs
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ChatRequest {
     user_message: String,
     system_prompt: Option<String>,
@@ -98,6 +88,7 @@ pub struct ChatRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ChatResponse {
     success: bool,
     message: Option<String>,
@@ -128,9 +119,9 @@ pub struct SystemPromptResponse {
     system_prompt: String,
 }
 
-// Pluely Prompts API
+// Freely Prompts API
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PluelyPrompt {
+pub struct FreelyPrompt {
     title: String,
     prompt: String,
     #[serde(rename = "modelId")]
@@ -140,8 +131,8 @@ pub struct PluelyPrompt {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct PluelyPromptsResponse {
-    prompts: Vec<PluelyPrompt>,
+pub struct FreelyPromptsResponse {
+    prompts: Vec<FreelyPrompt>,
     total: i32,
     #[serde(rename = "last_updated")]
     last_updated: Option<String>,
@@ -157,8 +148,6 @@ pub struct ApiResponseConfig {
     customer_id: Option<i64>,
     customer_email: Option<String>,
     customer_name: Option<String>,
-    license_key: String,
-    instance_id: String,
     #[serde(rename = "user_audio")]
     user_audio: Option<UserAudioConfig>,
     errors: Option<Vec<ApiConfigError>>,
@@ -197,7 +186,7 @@ pub async fn transcribe_audio(
     app: AppHandle,
     audio_base64: String,
 ) -> Result<AudioResponse, String> {
-    let (_, _, selected_model) = get_stored_credentials(&app).await?;
+    let selected_model = get_stored_credentials(&app).await?;
     let provider = selected_model.as_ref().map(|model| model.provider.clone());
     let model = selected_model.as_ref().map(|model| model.model.clone());
 
@@ -301,7 +290,7 @@ async fn fetch_api_response_config(
     let machine_id: String = app.machine_uid().get_machine_uid().unwrap().id.unwrap();
 
     // Get stored credentials
-    let (license_key, instance_id, _) = get_stored_credentials(app).await?;
+    let _selected_model = get_stored_credentials(app).await?;
 
     // Make HTTP request to response endpoint
     let client = reqwest::Client::new();
@@ -311,8 +300,6 @@ async fn fetch_api_response_config(
         .get(&url)
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", api_access_key))
-        .header("license_key", &license_key)
-        .header("instance", &instance_id)
         .header("machine_id", &machine_id);
 
     // Add optional headers
@@ -486,7 +473,7 @@ pub async fn chat_stream_response(
     history: Option<String>,
 ) -> Result<String, String> {
     // Get stored credentials to get selected model
-    let (_, _, selected_model) = get_stored_credentials(&app).await?;
+    let selected_model = get_stored_credentials(&app).await?;
     let (provider, model) = selected_model.as_ref().map_or((None, None), |m| {
         (Some(m.provider.clone()), Some(m.model.clone()))
     });
@@ -763,7 +750,7 @@ async fn user_activity(
         Err(_) => return Ok(()),
     };
 
-    let (license_key, instance_id, stored_model) = match get_stored_credentials(&app).await {
+    let stored_model = match get_stored_credentials(&app).await {
         Ok(values) => values,
         Err(_) => return Ok(()),
     };
@@ -783,8 +770,6 @@ async fn user_activity(
         .unwrap_or(configured_model);
 
     let mut payload = serde_json::json!({
-        "license": license_key,
-        "instance": instance_id,
         "machine_id": machine_id,
         "app_version": app_version,
         "ai_model": ai_model,
@@ -830,7 +815,7 @@ async fn report_api_error(
         Err(_) => return,
     };
 
-    let (license_key, instance_id, stored_model) = match get_stored_credentials(&app).await {
+    let stored_model = match get_stored_credentials(&app).await {
         Ok(values) => values,
         Err(_) => return,
     };
@@ -858,8 +843,6 @@ async fn report_api_error(
         "machine_id": machine_id,
         "error_message": error_message,
         "app_version": app_version,
-        "instance": instance_id,
-        "license_key": license_key,
         "endpoint": endpoint,
         "model": final_model,
         "provider": final_provider
@@ -889,9 +872,9 @@ pub async fn fetch_models(app: AppHandle) -> Result<Vec<Model>, String> {
     let app_endpoint = get_app_endpoint()?;
     let api_access_key = get_api_access_key()?;
 
-    let (license_key, instance_id) = match get_stored_credentials(&app).await {
-        Ok((lk, id, _)) => (lk, id),
-        Err(_) => ("".to_string(), "".to_string()),
+    let _selected_model = match get_stored_credentials(&app).await {
+        Ok(model) => model,
+        Err(_) => None,
     };
     let machine_id = app
         .machine_uid()
@@ -909,8 +892,6 @@ pub async fn fetch_models(app: AppHandle) -> Result<Vec<Model>, String> {
         .post(&url)
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", api_access_key))
-        .header("license_key", &license_key)
-        .header("instance", &instance_id)
         .header("machine_id", &machine_id)
         .header("app_version", &app_version)
         .send()
@@ -958,9 +939,9 @@ pub async fn fetch_models(app: AppHandle) -> Result<Vec<Model>, String> {
     Ok(models_response.models)
 }
 
-// Fetch Pluely Prompts API
+// Fetch Freely Prompts API
 #[tauri::command]
-pub async fn fetch_prompts() -> Result<PluelyPromptsResponse, String> {
+pub async fn fetch_prompts() -> Result<FreelyPromptsResponse, String> {
     let app_endpoint = get_app_endpoint()?;
     let api_access_key = get_api_access_key()?;
 
@@ -1006,7 +987,7 @@ pub async fn fetch_prompts() -> Result<PluelyPromptsResponse, String> {
         return Err(format!("Server error ({}): {}", status, error_text));
     }
 
-    let prompts_response: PluelyPromptsResponse = response
+    let prompts_response: FreelyPromptsResponse = response
         .json()
         .await
         .map_err(|e| format!("Failed to parse prompts response: {}", e))?;
@@ -1023,7 +1004,7 @@ pub async fn create_system_prompt(
     // Get environment variables
     let app_endpoint = get_app_endpoint()?;
     let api_access_key = get_api_access_key()?;
-    let (license_key, instance_id, _) = get_stored_credentials(&app).await?;
+    let _selected_model = get_stored_credentials(&app).await?;
     let machine_id: String = app.machine_uid().get_machine_uid().unwrap().id.unwrap();
     let app_version: String = app.package_info().version.to_string();
     // Make HTTP request to models endpoint
@@ -1034,8 +1015,6 @@ pub async fn create_system_prompt(
         .post(&url)
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", api_access_key))
-        .header("license_key", &license_key)
-        .header("instance", &instance_id)
         .header("machine_id", &machine_id)
         .header("app_version", &app_version)
         .json(&serde_json::json!({
@@ -1086,14 +1065,6 @@ pub async fn create_system_prompt(
     Ok(system_prompt_response)
 }
 
-// Helper command to check if license is available
-#[tauri::command]
-pub async fn check_license_status(app: AppHandle) -> Result<bool, String> {
-    match get_stored_credentials(&app).await {
-        Ok(_) => Ok(true),
-        Err(_) => Ok(false),
-    }
-}
 
 #[allow(dead_code)]
 #[tauri::command]
@@ -1101,7 +1072,7 @@ pub async fn get_activity(app: AppHandle) -> Result<serde_json::Value, String> {
     let app_endpoint = get_app_endpoint()?;
     let api_access_key = get_api_access_key()?;
 
-    let (license_key, instance_id, _) = get_stored_credentials(&app).await?;
+    let _selected_model = get_stored_credentials(&app).await?;
 
     let machine_id = match app.machine_uid().get_machine_uid() {
         Ok(id) => id.id.unwrap_or_default(),
@@ -1120,8 +1091,6 @@ pub async fn get_activity(app: AppHandle) -> Result<serde_json::Value, String> {
     let response = client
         .get(&activity_url)
         .header("Authorization", format!("Bearer {}", api_access_key))
-        .header("license_key", &license_key)
-        .header("instance_name", &instance_id)
         .header("machine_id", machine_id)
         .header("app_version", app_version)
         .send()
