@@ -21,14 +21,6 @@
 
 ---
 
-## 📥 Download
-
-[![Download for macOS](https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](#) &nbsp; [![Download for Linux](https://img.shields.io/badge/Download%20for-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](#) &nbsp; [![Download for Windows](https://img.shields.io/badge/Download%20for-Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)](#)
-
-**Available formats:** `.dmg` (macOS) · `.msi` / `.exe` (Windows) · `.deb` / `.rpm` / `.AppImage` (Linux)
-
----
-
 ## ✅ Everything is Free
 
 All features in Freely are available at no cost — no license keys, no subscriptions, no accounts. Just download and use it.
