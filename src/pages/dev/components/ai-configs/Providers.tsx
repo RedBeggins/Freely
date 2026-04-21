@@ -19,8 +19,13 @@ export const Providers = ({
         (p) => p?.id === selectedAIProvider?.provider
       );
       if (provider) {
-        const json = curl2Json(provider?.curl);
-        setLocalSelectedProvider(json as ResultJSON);
+        try {
+          const json = curl2Json(provider?.curl);
+          setLocalSelectedProvider(json as ResultJSON);
+        } catch (error) {
+          console.warn("Failed to parse curl command:", error);
+          setLocalSelectedProvider(null);
+        }
       }
     }
   }, [selectedAIProvider?.provider]);
@@ -48,16 +53,21 @@ export const Providers = ({
         />
         <Selection
           selected={selectedAIProvider?.provider}
-          options={allAiProviders?.map((provider) => {
-            const json = curl2Json(provider?.curl);
-            return {
-              label: provider?.isCustom
-                ? json?.url || "Custom Provider"
-                : provider?.id || "Custom Provider",
-              value: provider?.id || "Custom Provider",
-              isCustom: provider?.isCustom,
-            };
-          })}
+        options={allAiProviders?.map((provider) => {
+          let json: ResultJSON | null = null;
+          try {
+            json = curl2Json(provider?.curl) as ResultJSON;
+          } catch (error) {
+            console.warn("Failed to parse curl command:", error);
+          }
+          return {
+            label: provider?.isCustom
+              ? json?.url || "Custom Provider"
+              : provider?.id || "Custom Provider",
+            value: provider?.id || "Custom Provider",
+            isCustom: provider?.isCustom,
+          };
+        })}
           placeholder="Choose your AI provider"
           onChange={(value) => {
             onSetSelectedAIProvider({
@@ -174,11 +184,11 @@ export const Providers = ({
       ) : null}
 
       <div className="space-y-4 mt-2">
-        {variables
-          .filter(
-            (variable) => variable.key !== findKeyAndValue("api_key")?.key
-          )
-          .map((variable) => {
+      {variables?.
+        filter(
+          (variable) => variable.key !== findKeyAndValue("api_key")?.key
+        )
+        .map((variable) => {
             const getVariableValue = () => {
               if (!variable?.key || !selectedAIProvider?.variables) return "";
               return selectedAIProvider.variables[variable.key] || "";

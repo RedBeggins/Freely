@@ -14,8 +14,8 @@ export const useMenuItems = () => {
   const footerLinks: { icon: typeof MailIcon; title: string; link: string }[] = [];
 
   const footerItems = [
-    { icon: MailIcon, label: "Contact Support", href: "mailto:support@freely.com" },
-    { icon: BugIcon, label: "Report a bug", href: "mailto:support@freely.com" },
+    { icon: MailIcon, label: "Contact Support", href: "mailto:jeuelsosalarocca@gmail.com" },
+    { icon: BugIcon, label: "Report a bug", href: "mailto:jeuelsosalarocca@gmail.com" },
   ];
 
   return { menu, footerLinks, footerItems };

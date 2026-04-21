@@ -19,8 +19,13 @@ export const Providers = ({
         (p) => p?.id === selectedSttProvider?.provider
       );
       if (provider) {
-        const json = curl2Json(provider?.curl);
-        setLocalSelectedProvider(json as ResultJSON);
+        try {
+          const json = curl2Json(provider?.curl);
+          setLocalSelectedProvider(json as ResultJSON);
+        } catch (error) {
+          console.warn("Failed to parse curl command:", error);
+          setLocalSelectedProvider(null);
+        }
       }
     }
   }, [selectedSttProvider?.provider]);
@@ -48,16 +53,21 @@ export const Providers = ({
         />
         <Selection
           selected={selectedSttProvider?.provider}
-          options={allSttProviders?.map((provider) => {
-            const json = curl2Json(provider?.curl);
-            return {
-              label: provider?.isCustom
-                ? json?.url || "Custom Provider"
-                : provider?.id || "Custom Provider",
-              value: provider?.id || "Custom Provider",
-              isCustom: provider?.isCustom,
-            };
-          })}
+        options={allSttProviders?.map((provider) => {
+          let json: ResultJSON | null = null;
+          try {
+            json = curl2Json(provider?.curl) as ResultJSON;
+          } catch (error) {
+            console.warn("Failed to parse curl command:", error);
+          }
+          return {
+            label: provider?.isCustom
+              ? json?.url || "Custom Provider"
+              : provider?.id || "Custom Provider",
+            value: provider?.id || "Custom Provider",
+            isCustom: provider?.isCustom,
+          };
+        })}
           placeholder="Choose your STT provider"
           onChange={(value) => {
             onSetSelectedSttProvider({

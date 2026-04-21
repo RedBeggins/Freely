@@ -30,7 +30,12 @@ export const CustomProviders = ({ allSttProviders }: UseSettingsReturn) => {
             {allSttProviders
               .filter((provider) => provider?.isCustom)
               .map((provider) => {
-                const json = curl2Json(provider?.curl);
+                let json: { url?: string } | null = null;
+                try {
+                  json = curl2Json(provider?.curl) as { url?: string };
+                } catch (error) {
+                  console.warn("Failed to parse curl command:", error);
+                }
 
                 return (
                   <Card
