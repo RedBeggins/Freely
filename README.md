@@ -1,6 +1,6 @@
 # Freely 🚀
 
-[![Open Source](https://img.shields.io/badge/Open%20Source-❤️-blue)](https://github.com/your-username/freely)
+[![Open Source](https://img.shields.io/badge/Open%20Source-❤️-blue)](https://github.com/RedBeggins/freely)
 [![Tauri](https://img.shields.io/badge/Built%20with-Tauri-orange)](https://tauri.app/)
 [![React](https://img.shields.io/badge/Frontend-React%20%2B%20TypeScript-blue)](https://reactjs.org/)
 [![License](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
@@ -213,7 +213,7 @@ Before building from source, install the required system dependencies for your p
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/freely.git
+git clone https://github.com/RedBeggins/freely.git
 cd freely
 
 # Install dependencies
@@ -281,5 +281,5 @@ Licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE
 
 ## 🔗 Links
 
-- **Issues:** [GitHub Issues](https://github.com/your-username/freely/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/your-username/freely/discussions)
+- **Issues:** [GitHub Issues](https://github.com/RedBeggins/freely/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/RedBeggins/freely/discussions)
