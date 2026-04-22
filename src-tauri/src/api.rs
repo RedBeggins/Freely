@@ -10,13 +10,19 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_machine_uid::MachineUidExt;
 
 fn get_app_endpoint() -> Result<String, String> {
+    // Try runtime environment variable first
     if let Ok(endpoint) = env::var("APP_ENDPOINT") {
         return Ok(endpoint);
     }
-    match option_env!("APP_ENDPOINT") {
-        Some(endpoint) => Ok(endpoint.to_string()),
-        None => Err("APP_ENDPOINT environment variable not set. Please ensure it's set during the build process.".to_string())
+    // Try compile-time environment variable
+    if let Some(endpoint) = option_env!("APP_ENDPOINT") {
+        return Ok(endpoint.to_string());
     }
+    // Default for development mode (debug builds), error for release builds
+    #[cfg(debug_assertions)]
+    return Ok("http://localhost:3000".to_string());
+    #[cfg(not(debug_assertions))]
+    return Err("APP_ENDPOINT environment variable not set. Please ensure it's set during the build process.".to_string());
 }
 
 fn get_api_access_key() -> Result<String, String> {
