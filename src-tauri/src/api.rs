@@ -13,7 +13,6 @@ fn get_app_endpoint() -> Result<String, String> {
     if let Ok(endpoint) = env::var("APP_ENDPOINT") {
         return Ok(endpoint);
     }
-
     match option_env!("APP_ENDPOINT") {
         Some(endpoint) => Ok(endpoint.to_string()),
         None => Err("APP_ENDPOINT environment variable not set. Please ensure it's set during the build process.".to_string())
@@ -24,7 +23,6 @@ fn get_api_access_key() -> Result<String, String> {
     if let Ok(key) = env::var("API_ACCESS_KEY") {
         return Ok(key);
     }
-
     match option_env!("API_ACCESS_KEY") {
         Some(key) => Ok(key.to_string()),
         None => Err("API_ACCESS_KEY environment variable not set. Please ensure it's set during the build process.".to_string())
@@ -37,10 +35,10 @@ fn get_secure_storage_path(app: &AppHandle) -> Result<PathBuf, String> {
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data directory: {}", e))?;
-
+    
     fs::create_dir_all(&app_data_dir)
         .map_err(|e| format!("Failed to create app data directory: {}", e))?;
-
+    
     Ok(app_data_dir.join("secure_storage.json"))
 }
 
@@ -60,8 +58,8 @@ pub async fn get_stored_credentials(
         if let Ok(content) = fs::read_to_string(&storage_path) {
             if let Ok(storage) = serde_json::from_str::<SecureStorage>(&content) {
                 selected_model = storage
-                .selected_freely_model
-                .and_then(|json_str| serde_json::from_str(&json_str).ok());
+                    .selected_freely_model
+                    .and_then(|json_str| serde_json::from_str(&json_str).ok());
             }
         }
     }
@@ -224,7 +222,6 @@ pub async fn transcribe_audio(
                     .fallback_model
                     .as_ref()
                     .unwrap_or(&user_audio_config.model);
-
                 match perform_user_audio_transcription(
                     &client,
                     fallback_url,
@@ -343,10 +340,12 @@ async fn fetch_api_response_config(
 
         return Err(format!("Server error ({}): {}", status, error_text));
     }
+
     let api_config: ApiResponseConfig = response
         .json()
         .await
         .map_err(|e| format!("Failed to parse API config response: {}", e))?;
+
     Ok(api_config)
 }
 
@@ -673,8 +672,9 @@ pub async fn chat_stream_response(
                                 {
                                     if let Some(first_choice) = choices.first() {
                                         if let Some(delta) = first_choice.get("delta") {
-                                            if let Some(content) =
-                                                delta.get("content").and_then(|c| c.as_str())
+                                            if let Some(content) = delta
+                                                .get("content")
+                                                .and_then(|c| c.as_str())
                                             {
                                                 full_response.push_str(content);
                                                 // Emit just the content to frontend
@@ -882,6 +882,7 @@ pub async fn fetch_models(app: AppHandle) -> Result<Vec<Model>, String> {
         Ok(model) => model,
         Err(_) => None,
     };
+
     let machine_id = app
         .machine_uid()
         .get_machine_uid()
@@ -972,11 +973,10 @@ pub async fn fetch_prompts() -> Result<FreelyPromptsResponse, String> {
     // Check if the response is successful
     if !response.status().is_success() {
         let status = response.status();
-        let error_text = response
+        let _error_text = response
             .text()
             .await
             .unwrap_or_else(|_| "Unknown server error".to_string());
-
         tracing::warn!("Prompts API returned error status: {}", status);
         // Return empty response on server error
         return Ok(FreelyPromptsResponse {
@@ -986,10 +986,7 @@ pub async fn fetch_prompts() -> Result<FreelyPromptsResponse, String> {
         });
     }
 
-    let prompts_response: FreelyPromptsResponse = match response
-        .json()
-        .await
-    {
+    let prompts_response: FreelyPromptsResponse = match response.json().await {
         Ok(resp) => resp,
         Err(e) => {
             tracing::warn!("Failed to parse prompts response: {}", e);
@@ -1005,83 +1002,75 @@ pub async fn fetch_prompts() -> Result<FreelyPromptsResponse, String> {
     Ok(prompts_response)
 }
 
+// Helper to generate a local prompt when server is unavailable
+fn generate_local_prompt(user_prompt: &str) -> SystemPromptResponse {
+    let prompt_name = if user_prompt.len() > 40 {
+        format!("{}...", &user_prompt[..40])
+    } else {
+        user_prompt.to_string()
+    };
+
+    let system_prompt = format!(
+        "You are a helpful AI assistant specialized in: {}. Be concise, accurate, and friendly in your responses. Focus on providing practical and actionable advice.",
+        user_prompt
+    );
+
+    SystemPromptResponse {
+        prompt_name,
+        system_prompt,
+    }
+}
+
 // Create System Prompt API Command
 #[tauri::command]
 pub async fn create_system_prompt(
-    app: AppHandle,
+    _app: AppHandle,
     user_prompt: String,
 ) -> Result<SystemPromptResponse, String> {
-    // Get environment variables
-    let app_endpoint = get_app_endpoint()?;
-    let api_access_key = get_api_access_key()?;
-    let _selected_model = get_stored_credentials(&app).await?;
-    let machine_id: String = app.machine_uid().get_machine_uid().unwrap().id.unwrap();
-    let app_version: String = app.package_info().version.to_string();
-    // Make HTTP request to models endpoint
+    // Check if backend server is available
+    let (app_endpoint, api_access_key) = match (get_app_endpoint(), get_api_access_key()) {
+        (Ok(endpoint), Ok(key)) => (endpoint, key),
+        _ => {
+            // Server not configured - generate a local prompt
+            return Ok(generate_local_prompt(&user_prompt));
+        }
+    };
+
     let client = reqwest::Client::new();
     let url = format!("{}/api/prompt", app_endpoint);
 
-    let response = client
+    // Try to call the server
+    let response = match client
         .post(&url)
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", api_access_key))
-        .header("machine_id", &machine_id)
-        .header("app_version", &app_version)
-        .json(&serde_json::json!({
-            "user_prompt": user_prompt
-        }))
+        .json(&serde_json::json!({ "user_prompt": user_prompt }))
         .send()
         .await
-        .map_err(|e| {
-            let error_msg = format!("{}", e);
-            if error_msg.contains("url (") {
-                // Remove the URL part from the error message
-                let parts: Vec<&str> = error_msg.split(" for url (").collect();
-                if parts.len() > 1 {
-                    format!("Failed to make models request: {}", parts[0])
-                } else {
-                    format!("Failed to make models request: {}", error_msg)
-                }
-            } else {
-                format!("Failed to make models request: {}", error_msg)
-            }
-        })?;
-
-    // Check if the response is successful
-    if !response.status().is_success() {
-        let status = response.status();
-        let error_text = response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Unknown server error".to_string());
-
-        // Try to parse error as JSON to get a more specific error message
-        if let Ok(error_json) = serde_json::from_str::<serde_json::Value>(&error_text) {
-            if let Some(error_msg) = error_json.get("error").and_then(|e| e.as_str()) {
-                return Err(format!("Server error ({}): {}", status, error_msg));
-            } else if let Some(message) = error_json.get("message").and_then(|m| m.as_str()) {
-                return Err(format!("Server error ({}): {}", status, message));
-            }
+    {
+        Ok(resp) => resp,
+        Err(_) => {
+            // Server unreachable - generate a local prompt
+            return Ok(generate_local_prompt(&user_prompt));
         }
+    };
 
-        return Err(format!("Server error ({}): {}", status, error_text));
+    if !response.status().is_success() {
+        // Server returned error - generate a local prompt
+        return Ok(generate_local_prompt(&user_prompt));
     }
 
-    let system_prompt_response: SystemPromptResponse = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse system prompt response: {}", e))?;
-
-    Ok(system_prompt_response)
+    return match response.json::<SystemPromptResponse>().await {
+        Ok(resp) => Ok(resp),
+        Err(_) => Ok(generate_local_prompt(&user_prompt)),
+    };
 }
-
 
 #[allow(dead_code)]
 #[tauri::command]
 pub async fn get_activity(app: AppHandle) -> Result<serde_json::Value, String> {
     let app_endpoint = get_app_endpoint()?;
     let api_access_key = get_api_access_key()?;
-
     let _selected_model = get_stored_credentials(&app).await?;
 
     let machine_id = match app.machine_uid().get_machine_uid() {
