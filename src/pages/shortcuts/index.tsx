@@ -1,4 +1,4 @@
-import { CursorSelection } from "./components";
+import { CursorSelection, ShortcutManager } from "./components";
 import { PageLayout } from "@/layouts";
 
 const Shortcuts = () => {
@@ -10,6 +10,9 @@ const Shortcuts = () => {
       <div className="flex flex-col gap-6 pb-8">
         {/* Cursor Selection */}
         <CursorSelection />
+
+        {/* Global Shortcuts */}
+        <ShortcutManager />
       </div>
     </PageLayout>
   );

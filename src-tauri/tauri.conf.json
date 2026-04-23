@@ -9,14 +9,9 @@
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
-  "app": {
+"app": {
     "macOSPrivateApi": true,
     "withGlobalTauri": false,
-    "trayIcon": {
-      "iconPath": "icons/icon.ico",
-      "iconAsTemplate": false,
-      "menuOnLeftClick": true
-    },
     "windows": [
       {
         "title": "Freely - AI Assistant",

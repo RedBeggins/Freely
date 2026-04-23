@@ -79,7 +79,8 @@ export const useApp = () => {
       (event) => {
         const platform = navigator.platform.toLowerCase();
         if (typeof event.payload === "boolean" && platform.includes("win")) {
-          setIsHidden(!event.payload);
+          // event.payload: true = window is hidden, false = window is visible
+          setIsHidden(event.payload);
           // find popover open and close it
           const popover = document.getElementById("popover-content");
           // set display to none, change data-state to closed

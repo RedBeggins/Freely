@@ -4,7 +4,7 @@
   "description": "Capability for the main window on Windows and Linux",
   "windows": ["main", "dashboard"],
   "platforms": ["windows", "linux"],
-  "permissions": [
+"permissions": [
     "core:default",
     "opener:default",
     "updater:default",
@@ -17,6 +17,11 @@
     "global-shortcut:allow-unregister",
     "shell:allow-open",
     "core:window:allow-start-dragging",
+"core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-is-visible",
+    "core:window:allow-unminimize",
     "sql:default",
     "sql:allow-execute",
     "posthog:default",

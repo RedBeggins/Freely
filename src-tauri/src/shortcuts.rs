@@ -162,23 +162,51 @@ fn handle_toggle_window<R: Runtime>(app: &AppHandle<R>) {
 
     #[cfg(target_os = "windows")]
     {
-        let state = app.state::<WindowVisibility>();
-        let mut is_hidden = state.is_hidden.lock().unwrap();
-        *is_hidden = !*is_hidden;
-
-        if let Err(e) = window.emit("toggle-window-visibility", *is_hidden) {
-            eprintln!("Failed to emit toggle-window-visibility event: {}", e);
-        }
-
-        if !*is_hidden {
-            if let Err(e) = window.show() {
-                eprintln!("Failed to show window: {}", e);
+        // Check actual window visibility instead of using internal state
+        match window.is_visible() {
+            Ok(true) => {
+                // Window is visible, hide it
+                if let Err(e) = window.hide() {
+                    eprintln!("Failed to hide window: {}", e);
+                    return;
+                }
+                
+                // Only emit event AFTER window is successfully hidden
+                if let Err(e) = window.emit("toggle-window-visibility", true) {
+                    eprintln!("Failed to emit toggle-window-visibility event: {}", e);
+                }
             }
-            if let Err(e) = window.set_focus() {
-                eprintln!("Failed to focus window: {}", e);
+            Ok(false) => {
+                // Window is hidden, show it
+                
+                // Try unminimize first to restore from minimized state
+                if let Err(e) = window.unminimize() {
+                    eprintln!("Failed to unminimize window: {}", e);
+                }
+
+                // Show the window BEFORE emitting the event
+                if let Err(e) = window.show() {
+                    eprintln!("Failed to show window: {}", e);
+                    return;
+                }
+
+                // Set focus
+                if let Err(e) = window.set_focus() {
+                    eprintln!("Failed to focus window: {}", e);
+                }
+                
+                // Emit focus event
+                if let Err(e) = window.emit("focus-text-input", json!({})) {
+                    eprintln!("Failed to emit focus-text-input event: {}", e);
+                }
+                
+                // Emit visibility event AFTER window is fully shown
+                if let Err(e) = window.emit("toggle-window-visibility", false) {
+                    eprintln!("Failed to emit toggle-window-visibility event: {}", e);
+                }
             }
-            if let Err(e) = window.emit("focus-text-input", json!({})) {
-                eprintln!("Failed to emit focus-text-input event: {}", e);
+            Err(e) => {
+                eprintln!("Failed to check window visibility: {}", e);
             }
         }
         return;
