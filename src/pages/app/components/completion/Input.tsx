@@ -1,4 +1,5 @@
 import { Loader2, XIcon } from "lucide-react";
+import { useEffect } from "react";
 import {
   Popover,
   PopoverContent,
@@ -35,6 +36,53 @@ export const Input = ({
   keepEngaged,
   setKeepEngaged,
 }: UseCompletionReturn & { isHidden: boolean }) => {
+  const sortedConversationHistory = conversationHistory
+    .slice()
+    .sort(
+      (a, b) => (Number(a?.timestamp) || 0) - (Number(b?.timestamp) || 0)
+    );
+
+  useEffect(() => {
+    if (!isPopoverOpen) return;
+
+    const scrollToBottom = () => {
+      const host = scrollAreaRef?.current as unknown as HTMLElement | null;
+      const viewport = host?.querySelector(
+        '[data-slot="scroll-area-viewport"]'
+      ) as HTMLElement | null;
+      if (!viewport) return;
+      viewport.scrollTop = viewport.scrollHeight;
+    };
+
+    // The content inside the popover can grow after initial paint (Markdown, images,
+    // conditional history render). Do a few passes to reliably land at the bottom.
+    const raf1 = requestAnimationFrame(() => {
+      scrollToBottom();
+      const raf2 = requestAnimationFrame(() => {
+        scrollToBottom();
+        const raf3 = requestAnimationFrame(scrollToBottom);
+        // One more pass after layout settles.
+        const timeoutId = window.setTimeout(scrollToBottom, 120);
+
+        return () => {
+          cancelAnimationFrame(raf3);
+          window.clearTimeout(timeoutId);
+        };
+      });
+
+      return () => cancelAnimationFrame(raf2);
+    });
+
+    return () => cancelAnimationFrame(raf1);
+  }, [
+    isPopoverOpen,
+    keepEngaged,
+    isLoading,
+    response,
+    conversationHistory.length,
+    scrollAreaRef,
+  ]);
+
   return (
     <div className="relative flex-1">
       <Popover
@@ -166,44 +214,62 @@ export const Input = ({
                   <span className="text-sm">Generating response...</span>
                 </div>
               )}
-              {response && <Markdown>{response}</Markdown>}
+              {/* In conversation mode, the latest assistant turn should appear at the bottom,
+                  so we render the streaming response as a chat bubble below the history. */}
+              {!keepEngaged && response && <Markdown>{response}</Markdown>}
 
               {/* Conversation History - Separate scroll, no auto-scroll */}
               {keepEngaged && conversationHistory.length > 1 && (
-                <div className="space-y-3 pt-3">
-                  {conversationHistory
-                    .sort((a, b) => b?.timestamp - a?.timestamp)
-                    .map((message, index) => {
-                      if (!isLoading && index === 0) {
-                        return null;
+                <div className="space-y-2 pt-3">
+                  {sortedConversationHistory.map((message) => {
+                    const isUser = message.role === "user";
+                    const timeLabel = new Date(message.timestamp).toLocaleTimeString(
+                      [],
+                      {
+                        hour: "2-digit",
+                        minute: "2-digit",
                       }
-                      return (
-                        <div
-                          key={message.id}
-                          className={`p-3 rounded-lg text-sm ${
-                            message.role === "user"
-                              ? "bg-primary/10 border-l-4 border-primary"
-                              : "bg-muted/50"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xs font-medium text-muted-foreground uppercase">
-                              {message.role === "user" ? "You" : "AI"}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(message.timestamp).toLocaleTimeString(
-                                [],
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                }
-                              )}
-                            </span>
+                    );
+                    return (
+                      <div
+                        key={message.id}
+                        className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                      >
+                        <div className={isUser ? "max-w-[85%]" : "w-full"}>
+                          <div
+                            className={
+                              isUser
+                                ? "relative px-5 py-3 rounded-2xl text-sm leading-snug text-white bg-gradient-to-b from-blue-500/90 to-blue-600/65 border border-blue-300/25 shadow-[0_14px_40px_rgba(0,0,0,0.25)] shadow-inner after:content-[''] after:absolute after:inset-0 after:rounded-2xl after:bg-gradient-to-b after:from-white/25 after:to-transparent after:opacity-70 after:pointer-events-none"
+                                : "text-sm"
+                            }
+                          >
+                            <Markdown>{message.content}</Markdown>
                           </div>
-                          <Markdown>{message.content}</Markdown>
+                          <div
+                            className={`mt-1 text-[10px] leading-none text-muted-foreground/70 select-none ${
+                              isUser ? "text-right" : "text-left"
+                            }`}
+                          >
+                            {timeLabel}
+                          </div>
                         </div>
-                      );
-                    })}
+                      </div>
+                    );
+                  })}
+
+                  {/* Streaming/preview assistant response pinned to bottom */}
+                  {(isLoading || !sortedConversationHistory.length) &&
+                    response?.trim() && (
+                      <div className="w-full text-sm">
+                        <Markdown>{response}</Markdown>
+                        <div className="mt-1 text-[10px] leading-none text-muted-foreground/70 select-none text-left">
+                          {new Date().toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                      </div>
+                    )}
                 </div>
               )}
             </div>

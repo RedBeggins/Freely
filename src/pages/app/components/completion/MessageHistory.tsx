@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { MessageSquareText, ChevronUp, ChevronDown } from "lucide-react";
 import {
   Popover,
@@ -23,6 +24,23 @@ export const MessageHistory = ({
   messageHistoryOpen,
   setMessageHistoryOpen,
 }: MessageHistoryProps) => {
+  const scrollAreaHostRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!messageHistoryOpen) return;
+
+    const scrollToBottom = () => {
+      const viewport = scrollAreaHostRef.current?.querySelector(
+        '[data-slot="scroll-area-viewport"]'
+      ) as HTMLElement | null;
+      if (!viewport) return;
+      viewport.scrollTop = viewport.scrollHeight;
+    };
+
+    // Ensure the popover + scroll area have mounted and measured.
+    requestAnimationFrame(() => requestAnimationFrame(scrollToBottom));
+  }, [messageHistoryOpen]);
+
   return (
     <Popover open={messageHistoryOpen} onOpenChange={setMessageHistoryOpen}>
       <PopoverTrigger asChild>
@@ -81,35 +99,41 @@ export const MessageHistory = ({
           </div>
         </div>
 
-        <ScrollArea className="h-[calc(100vh-10rem)]">
-          <div className="p-4 space-y-4">
-            {conversationHistory
-              .sort((a, b) => b?.timestamp - a?.timestamp)
-              .map((message) => (
-                <div
-                  key={message.id}
-                  className={`p-3 rounded-lg ${
-                    message.role === "user"
-                      ? "bg-primary/10 border-l-4 border-primary"
-                      : "bg-muted/50"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs font-medium text-muted-foreground uppercase">
-                      {message.role === "user" ? "You" : "AI"}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(message.timestamp).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
+        <div ref={scrollAreaHostRef}>
+          <ScrollArea className="h-[calc(100vh-10rem)]">
+            <div className="p-4 space-y-4">
+              {conversationHistory
+                .slice()
+                .sort(
+                  (a, b) =>
+                    (Number(a?.timestamp) || 0) - (Number(b?.timestamp) || 0)
+                )
+                .map((message) => (
+                  <div
+                    key={message.id}
+                    className={`p-3 rounded-lg ${
+                      message.role === "user"
+                        ? "bg-primary/10 border-l-4 border-primary"
+                        : "bg-muted/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase">
+                        {message.role === "user" ? "You" : "AI"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(message.timestamp).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                    <Markdown>{message.content}</Markdown>
                   </div>
-                  <Markdown>{message.content}</Markdown>
-                </div>
-              ))}
-          </div>
-        </ScrollArea>
+                ))}
+            </div>
+          </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
