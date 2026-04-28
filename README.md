@@ -95,6 +95,18 @@ Create and manage custom system prompts to define how the AI behaves. Features i
 - **Response Length:** Short, Medium, Long, or Auto
 - **Response Language:** Over 50 supported languages
 - **Auto-Scroll:** Automatically scroll to the latest message
+- **Tool Calls (Web Search):** (Optional) Allow OpenAI-compatible `tools/tool_calls` so models can call a built-in `web_search` tool mid-response and attach sources in the UI.
+
+### Web Search (Tool Calls)
+
+Freely can optionally perform **web search as a tool call** (OpenAI-compatible `tools` / `tool_calls`) and show **collapsible Sources** under the assistant response.
+
+- **Enable tool calls**: Dashboard → **Response Settings** → **Tool Calls (Web Search)**
+- **Enable web search tool**: Dashboard → **Dev Space** → **Web Search (Free)**
+
+Notes:
+- The built-in free search provider uses **DuckDuckGo HTML** (no API key). It’s not an official API and may break if markup changes.
+- Many providers/models will **reject** `tools/tool_calls` and return a 400. If you see API errors, disable Tool Calls.
 
 ## Screenshot Settings
 
@@ -144,6 +156,10 @@ curl -X POST https://api.example.com/v1/chat/completions \
 ```
 
 **Dynamic variables:** `{{TEXT}}`, `{{IMAGE}}`, `{{SYSTEM_PROMPT}}`, `{{MODEL}}`, `{{API_KEY}}` (AI) · `{{AUDIO}}`, `{{API_KEY}}`, `{{LANGUAGE}}` (STT)
+
+### Web Search (Free)
+
+Dev Space includes a **Web Search (Free)** section to enable/disable the built-in `web_search` tool used by Tool Calls.
 
 ---
 
