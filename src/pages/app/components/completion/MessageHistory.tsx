@@ -118,6 +118,16 @@ export const MessageHistory = ({
                       minute: "2-digit",
                     }
                   );
+                  const imagePreview = Array.isArray((message as any).attachedFiles)
+                    ? (message as any).attachedFiles.find(
+                        (f: any) =>
+                          f &&
+                          typeof f.type === "string" &&
+                          f.type.startsWith("image/") &&
+                          typeof f.base64 === "string" &&
+                          f.base64.trim().length > 0
+                      )
+                    : null;
 
                   return (
                     <div
@@ -134,6 +144,15 @@ export const MessageHistory = ({
                               : "text-sm"
                           }
                         >
+                          {isUser && imagePreview && (
+                            <div className="mb-2 flex justify-end">
+                              <img
+                                src={`data:${imagePreview.type};base64,${imagePreview.base64}`}
+                                alt={imagePreview.name || "Screenshot"}
+                                className="w-28 h-16 rounded-md object-cover border border-white/20"
+                              />
+                            </div>
+                          )}
                           <Markdown>{message.content}</Markdown>
                           {!isUser && <Sources sources={(message as any).sources} />}
                         </div>

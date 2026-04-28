@@ -34,6 +34,7 @@ interface ChatMessage {
   content: string;
   timestamp: number;
   sources?: Array<{ title: string; url: string; snippet?: string }>;
+  attachedFiles?: AttachedFile[];
 }
 
 interface ChatConversation {
@@ -547,6 +548,10 @@ export const useCompletion = () => {
         role: "user",
         content: userMessage,
         timestamp,
+        attachedFiles:
+          Array.isArray(_attachedFiles) && _attachedFiles.length > 0
+            ? _attachedFiles
+            : undefined,
       };
 
       const assistantMsg: ChatMessage = {

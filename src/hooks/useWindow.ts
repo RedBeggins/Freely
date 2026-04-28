@@ -4,10 +4,12 @@ import { useCallback, useEffect } from "react";
 
 // Helper function to check if any popover is open in the DOM
 const isAnyPopoverOpen = (): boolean => {
-  const popoverContents = document.querySelectorAll(
-    "[data-radix-popper-content-wrapper]"
+  // Radix keeps popover wrappers mounted even when closed (data-state="closed").
+  // Only treat it as open if there is an open content node.
+  const openContents = document.querySelectorAll(
+    '[data-radix-popper-content-wrapper] [data-state="open"]'
   );
-  return popoverContents.length > 0;
+  return openContents.length > 0;
 };
 
 export const useWindowResize = () => {
