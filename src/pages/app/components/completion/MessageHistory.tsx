@@ -80,7 +80,7 @@ export const MessageHistory = ({
         side="bottom"
         className="select-none w-screen p-0 mt-3 border overflow-hidden border-input/50"
       >
-        <div className="border-b border-input/50 p-4">
+        <div className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center flex-col">
               <h2 className="text-lg font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
@@ -118,7 +118,10 @@ export const MessageHistory = ({
         </div>
 
         <div ref={scrollAreaHostRef}>
-          <ScrollArea className="h-[calc(100vh-10rem)]">
+          <ScrollArea
+            className="h-[calc(100vh-10rem)]"
+            viewportClassName="[-webkit-mask-image:linear-gradient(to_bottom,transparent_0,black_28px,black_100%)] [mask-image:linear-gradient(to_bottom,transparent_0,black_28px,black_100%)]"
+          >
             <div className="p-4 space-y-2">
               {conversationHistory
                 .slice()

@@ -144,7 +144,7 @@ export const Input = ({
           className="w-screen p-0 border shadow-lg overflow-hidden"
           sideOffset={8}
         >
-          <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
+          <div className="flex items-center justify-between px-4 py-2 bg-muted/30">
             <div className="flex flex-row gap-1 items-center">
               <h3 className="font-semibold text-xs select-none">
                 {keepEngaged ? "Conversation Mode" : "AI Response"}
@@ -204,8 +204,13 @@ export const Input = ({
             </div>
           </div>
 
-          <ScrollArea ref={scrollAreaRef} className="h-[calc(100vh-7rem)]">
-            <div className="p-4">
+          <div>
+            <ScrollArea
+              ref={scrollAreaRef}
+              className="h-[calc(100vh-7rem)]"
+              viewportClassName="[-webkit-mask-image:linear-gradient(to_bottom,transparent_0,black_28px,black_100%)] [mask-image:linear-gradient(to_bottom,transparent_0,black_28px,black_100%)]"
+            >
+              <div className="p-4">
               {error && (
                 <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded text-sm text-destructive">
                   <strong>Error:</strong> {error}
@@ -306,8 +311,9 @@ export const Input = ({
                     )}
                 </div>
               )}
-            </div>
-          </ScrollArea>
+              </div>
+            </ScrollArea>
+          </div>
         </PopoverContent>
       </Popover>
     </div>
