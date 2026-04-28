@@ -25,6 +25,7 @@ interface DbMessage {
   content: string;
   timestamp: number;
   attached_files: string | null; // JSON string
+  sources: string | null; // JSON string
 }
 
 /**
@@ -119,9 +120,10 @@ export async function createConversation(
       const attachedFilesJson = message.attachedFiles
         ? JSON.stringify(message.attachedFiles)
         : null;
+      const sourcesJson = message.sources ? JSON.stringify(message.sources) : null;
 
       await db.execute(
-        "INSERT INTO messages (id, conversation_id, role, content, timestamp, attached_files) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO messages (id, conversation_id, role, content, timestamp, attached_files, sources) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [
           message.id,
           conversation.id,
@@ -129,6 +131,7 @@ export async function createConversation(
           message.content,
           message.timestamp,
           attachedFilesJson,
+          sourcesJson,
         ]
       );
     }
@@ -190,6 +193,7 @@ export async function getAllConversations(): Promise<ChatConversation[]> {
           content: msg.content,
           timestamp: msg.timestamp,
           attachedFiles: safeJsonParse(msg.attached_files, undefined),
+          sources: safeJsonParse(msg.sources, undefined),
         })) || [],
     }));
   } catch (error) {
@@ -241,6 +245,7 @@ export async function getConversationById(
         content: msg.content,
         timestamp: msg.timestamp,
         attachedFiles: safeJsonParse(msg.attached_files, undefined),
+        sources: safeJsonParse(msg.sources, undefined),
       })),
     };
   } catch (error) {
@@ -294,9 +299,10 @@ export async function updateConversation(
         const attachedFilesJson = message.attachedFiles
           ? JSON.stringify(message.attachedFiles)
           : null;
+    const sourcesJson = message.sources ? JSON.stringify(message.sources) : null;
 
         await db.execute(
-          "INSERT INTO messages (id, conversation_id, role, content, timestamp, attached_files) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO messages (id, conversation_id, role, content, timestamp, attached_files, sources) VALUES (?, ?, ?, ?, ?, ?, ?)",
           [
             message.id,
             conversation.id,
@@ -304,6 +310,7 @@ export async function updateConversation(
             message.content,
             message.timestamp,
             attachedFilesJson,
+        sourcesJson,
           ]
         );
       }
@@ -316,7 +323,7 @@ export async function updateConversation(
       for (const msg of existingMessages) {
         await db
           .execute(
-            "INSERT INTO messages (id, conversation_id, role, content, timestamp, attached_files) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO messages (id, conversation_id, role, content, timestamp, attached_files, sources) VALUES (?, ?, ?, ?, ?, ?, ?)",
             [
               msg.id,
               msg.conversation_id,
@@ -324,6 +331,7 @@ export async function updateConversation(
               msg.content,
               msg.timestamp,
               msg.attached_files,
+              msg.sources,
             ]
           )
           .catch(() => {});
@@ -513,9 +521,10 @@ export async function migrateLocalStorageToSQLite(): Promise<{
             const attachedFilesJson = message.attachedFiles
               ? JSON.stringify(message.attachedFiles)
               : null;
+            const sourcesJson = message.sources ? JSON.stringify(message.sources) : null;
 
             await db.execute(
-              "INSERT INTO messages (id, conversation_id, role, content, timestamp, attached_files) VALUES (?, ?, ?, ?, ?, ?)",
+              "INSERT INTO messages (id, conversation_id, role, content, timestamp, attached_files, sources) VALUES (?, ?, ?, ?, ?, ?, ?)",
               [
                 message.id,
                 conversation.id,
@@ -523,6 +532,7 @@ export async function migrateLocalStorageToSQLite(): Promise<{
                 message.content,
                 message.timestamp || Date.now(),
                 attachedFilesJson,
+                sourcesJson,
               ]
             );
           }

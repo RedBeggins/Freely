@@ -7,12 +7,19 @@ export interface AttachedFile {
   size: number;
 }
 
+export interface WebSource {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: number;
   attachedFiles?: AttachedFile[];
+  sources?: WebSource[];
 }
 
 export interface ChatConversation {
@@ -26,6 +33,7 @@ export interface ChatConversation {
 export interface CompletionState {
   input: string;
   response: string;
+  responseSources?: WebSource[];
   isLoading: boolean;
   error: string | null;
   attachedFiles: AttachedFile[];
@@ -35,7 +43,7 @@ export interface CompletionState {
 
 // Provider-related types
 export interface Message {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content:
     | string
     | Array<{

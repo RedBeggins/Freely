@@ -20,6 +20,7 @@ fn get_secure_storage_path(app: &AppHandle) -> Result<PathBuf, String> {
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct SecureStorage {
     selected_pluely_model: Option<String>,
+    web_search_enabled: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -30,7 +31,8 @@ pub struct StorageItem {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StorageResult {
-    selected_pluely_model: Option<String>,
+    pub selected_pluely_model: Option<String>,
+    pub web_search_enabled: Option<bool>,
 }
 
 #[tauri::command]
@@ -51,6 +53,9 @@ pub async fn secure_storage_save(
     for item in items {
         match item.key.as_str() {
             "selected_pluely_model" => storage.selected_pluely_model = Some(item.value),
+            "web_search_enabled" => {
+                storage.web_search_enabled = Some(item.value == "true" || item.value == "1")
+            }
             _ => return Err(format!("Invalid storage key: {}", item.key)),
         }
     }
@@ -71,6 +76,7 @@ pub async fn secure_storage_get(app: AppHandle) -> Result<StorageResult, String>
     if !storage_path.exists() {
         return Ok(StorageResult {
             selected_pluely_model: None,
+            web_search_enabled: None,
         });
     }
 
@@ -82,6 +88,7 @@ pub async fn secure_storage_get(app: AppHandle) -> Result<StorageResult, String>
 
     Ok(StorageResult {
         selected_pluely_model: storage.selected_pluely_model,
+        web_search_enabled: storage.web_search_enabled,
     })
 }
 
@@ -102,6 +109,7 @@ pub async fn secure_storage_remove(app: AppHandle, keys: Vec<String>) -> Result<
     for key in keys {
         match key.as_str() {
             "selected_pluely_model" => storage.selected_pluely_model = None,
+            "web_search_enabled" => storage.web_search_enabled = None,
             _ => return Err(format!("Invalid storage key: {}", key)),
         }
     }

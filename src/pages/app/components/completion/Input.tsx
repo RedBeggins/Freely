@@ -10,6 +10,7 @@ import {
   Markdown,
   Switch,
   CopyButton,
+  Sources,
 } from "@/components";
 import { UseCompletionReturn } from "@/types";
 import { MessageHistory } from "./MessageHistory";
@@ -35,6 +36,8 @@ export const Input = ({
   isHidden,
   keepEngaged,
   setKeepEngaged,
+  responseSources,
+  isToolSearchingWeb,
 }: UseCompletionReturn & { isHidden: boolean }) => {
   const sortedConversationHistory = conversationHistory
     .slice()
@@ -216,7 +219,18 @@ export const Input = ({
               )}
               {/* In conversation mode, the latest assistant turn should appear at the bottom,
                   so we render the streaming response as a chat bubble below the history. */}
-              {!keepEngaged && response && <Markdown>{response}</Markdown>}
+              {!keepEngaged && response && (
+                <>
+                  <Markdown>{response}</Markdown>
+                  <Sources sources={responseSources} />
+                </>
+              )}
+
+              {!keepEngaged && isToolSearchingWeb && (
+                <div className="relative inline-flex items-center text-[11px] text-muted-foreground/70 select-none tool-searching-web">
+                  Searching the web
+                </div>
+              )}
 
               {/* Conversation History - Separate scroll, no auto-scroll */}
               {keepEngaged && conversationHistory.length > 1 && (
@@ -244,6 +258,7 @@ export const Input = ({
                             }
                           >
                             <Markdown>{message.content}</Markdown>
+                            {!isUser && <Sources sources={(message as any).sources} />}
                           </div>
                           <div
                             className={`mt-1 text-[10px] leading-none text-muted-foreground/70 select-none ${

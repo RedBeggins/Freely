@@ -99,6 +99,21 @@ pub struct ChatResponse {
     error: Option<String>,
 }
 
+// Web Search API Structs
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WebSource {
+    title: String,
+    url: String,
+    snippet: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WebSearchResponse {
+    sources: Vec<WebSource>,
+    #[serde(rename = "fetched_at")]
+    fetched_at: i64,
+}
+
 // Model API Structs
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Model {
@@ -279,6 +294,88 @@ pub async fn transcribe_audio(
             Err("Transcription failed. Please try again.".to_string())
         }
     }
+}
+
+async fn is_web_search_enabled(app: &AppHandle) -> bool {
+    match crate::activate::secure_storage_get(app.clone()).await {
+        Ok(storage) => storage.web_search_enabled.unwrap_or(true),
+        Err(_) => true,
+    }
+}
+
+#[tauri::command]
+pub async fn web_search(app: AppHandle, query: String) -> Result<WebSearchResponse, String> {
+    if !is_web_search_enabled(&app).await {
+        return Err("Web search is disabled. Enable it in Dev Space.".to_string());
+    }
+
+    let q = query.trim();
+    if q.is_empty() {
+        return Ok(WebSearchResponse {
+            sources: vec![],
+            fetched_at: chrono::Utc::now().timestamp_millis(),
+        });
+    }
+
+    // Free provider: DuckDuckGo HTML (no API key). Non-official; may break if DDG changes markup.
+    let client = reqwest::Client::new();
+    let resp = client
+        .get("https://duckduckgo.com/html/")
+        .header("Accept", "text/html")
+        .query(&[("q", q)])
+        .send()
+        .await
+        .map_err(|e| format!("Web search request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unable to read search error body".to_string());
+        return Err(format!("Web search failed ({}): {}", status, body));
+    }
+
+    let html = resp
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read search HTML: {}", e))?;
+
+    let document = scraper::Html::parse_document(&html);
+    let result_sel = scraper::Selector::parse(".results .result").map_err(|e| e.to_string())?;
+    let title_sel = scraper::Selector::parse("a.result__a").map_err(|e| e.to_string())?;
+    let snippet_sel =
+        scraper::Selector::parse(".result__snippet").map_err(|e| e.to_string())?;
+
+    let mut sources: Vec<WebSource> = Vec::new();
+    for result in document.select(&result_sel).take(5) {
+        let a = result.select(&title_sel).next();
+        let Some(a) = a else { continue };
+
+        let title = a.text().collect::<Vec<_>>().join(" ").trim().to_string();
+        let url = a
+            .value()
+            .attr("href")
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if title.is_empty() || url.is_empty() {
+            continue;
+        }
+
+        let snippet = result
+            .select(&snippet_sel)
+            .next()
+            .map(|n| n.text().collect::<Vec<_>>().join(" ").trim().to_string())
+            .filter(|s| !s.is_empty());
+
+        sources.push(WebSource { title, url, snippet });
+    }
+
+    Ok(WebSearchResponse {
+        sources,
+        fetched_at: chrono::Utc::now().timestamp_millis(),
+    })
 }
 
 // Helper function to fetch API response configuration

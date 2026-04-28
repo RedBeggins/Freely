@@ -9,12 +9,14 @@ export interface ResponseSettings {
   responseLength: string;
   language: string;
   autoScroll: boolean;
+  enableToolCalls: boolean;
 }
 
 export const DEFAULT_RESPONSE_SETTINGS: ResponseSettings = {
   responseLength: DEFAULT_RESPONSE_LENGTH,
   language: DEFAULT_LANGUAGE,
   autoScroll: DEFAULT_AUTO_SCROLL,
+  enableToolCalls: false,
 };
 
 /**
@@ -38,6 +40,10 @@ export const getResponseSettings = (): ResponseSettings => {
         parsedSettings.autoScroll !== undefined
           ? parsedSettings.autoScroll
           : DEFAULT_RESPONSE_SETTINGS.autoScroll,
+      enableToolCalls:
+        parsedSettings.enableToolCalls !== undefined
+          ? parsedSettings.enableToolCalls
+          : DEFAULT_RESPONSE_SETTINGS.enableToolCalls,
     };
   } catch (error) {
     console.error("Failed to get response settings:", error);
@@ -87,6 +93,18 @@ export const updateLanguage = (language: string): ResponseSettings => {
 export const updateAutoScroll = (autoScroll: boolean): ResponseSettings => {
   const currentSettings = getResponseSettings();
   const newSettings = { ...currentSettings, autoScroll };
+  setResponseSettings(newSettings);
+  return newSettings;
+};
+
+/**
+ * Enable/disable native tool calls (OpenAI-compatible `tools` / `tool_calls`).
+ */
+export const updateEnableToolCalls = (
+  enableToolCalls: boolean
+): ResponseSettings => {
+  const currentSettings = getResponseSettings();
+  const newSettings = { ...currentSettings, enableToolCalls };
   setResponseSettings(newSettings);
   return newSettings;
 };

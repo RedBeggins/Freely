@@ -17,5 +17,12 @@ pub fn migrations() -> Vec<Migration> {
             sql: include_str!("migrations/chat-history.sql"),
             kind: MigrationKind::Up,
         },
+        // Migration 3: Add optional sources to messages
+        Migration {
+            version: 3,
+            description: "add_web_sources_to_messages",
+            sql: include_str!("migrations/web-sources.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

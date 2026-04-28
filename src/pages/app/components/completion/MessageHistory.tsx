@@ -7,6 +7,7 @@ import {
   Button,
   ScrollArea,
   Markdown,
+  Sources,
 } from "@/components";
 import { ChatMessage } from "@/types/completion";
 
@@ -101,36 +102,52 @@ export const MessageHistory = ({
 
         <div ref={scrollAreaHostRef}>
           <ScrollArea className="h-[calc(100vh-10rem)]">
-            <div className="p-4 space-y-4">
+            <div className="p-4 space-y-2">
               {conversationHistory
                 .slice()
                 .sort(
                   (a, b) =>
                     (Number(a?.timestamp) || 0) - (Number(b?.timestamp) || 0)
                 )
-                .map((message) => (
-                  <div
-                    key={message.id}
-                    className={`p-3 rounded-lg ${
-                      message.role === "user"
-                        ? "bg-primary/10 border-l-4 border-primary"
-                        : "bg-muted/50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-medium text-muted-foreground uppercase">
-                        {message.role === "user" ? "You" : "AI"}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(message.timestamp).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
+                .map((message) => {
+                  const isUser = message.role === "user";
+                  const timeLabel = new Date(message.timestamp).toLocaleTimeString(
+                    [],
+                    {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }
+                  );
+
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex ${
+                        isUser ? "justify-end" : "justify-start"
+                      }`}
+                    >
+                      <div className={isUser ? "max-w-[85%]" : "w-full"}>
+                        <div
+                          className={
+                            isUser
+                              ? "relative px-5 py-3 rounded-2xl text-sm leading-snug text-white bg-gradient-to-b from-blue-500/90 to-blue-600/65 border border-blue-300/25 shadow-[0_14px_40px_rgba(0,0,0,0.25)] shadow-inner after:content-[''] after:absolute after:inset-0 after:rounded-2xl after:bg-gradient-to-b after:from-white/25 after:to-transparent after:opacity-70 after:pointer-events-none"
+                              : "text-sm"
+                          }
+                        >
+                          <Markdown>{message.content}</Markdown>
+                          {!isUser && <Sources sources={(message as any).sources} />}
+                        </div>
+                        <div
+                          className={`mt-1 text-[10px] leading-none text-muted-foreground/70 select-none ${
+                            isUser ? "text-right" : "text-left"
+                          }`}
+                        >
+                          {timeLabel}
+                        </div>
+                      </div>
                     </div>
-                    <Markdown>{message.content}</Markdown>
-                  </div>
-                ))}
+                  );
+                })}
             </div>
           </ScrollArea>
         </div>

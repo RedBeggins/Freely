@@ -30,6 +30,10 @@ export interface UseCompletionReturn {
   response: string;
   /** Function to update the response text */
   setResponse: (value: string) => void;
+  /** Optional sources for the current response */
+  responseSources?: Array<{ title: string; url: string; snippet?: string }>;
+  /** Whether a tool is currently performing web search */
+  isToolSearchingWeb?: boolean;
 
   // Loading and error states
   /** Whether a completion request is currently in progress */

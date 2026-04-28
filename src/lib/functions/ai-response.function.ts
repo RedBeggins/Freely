@@ -174,6 +174,10 @@ export async function* fetchAIResponse(params: {
   history?: Message[];
   userMessage: string;
   imagesBase64?: string[];
+  /** Merge these fields into the request body after variable replacement. */
+  extraBody?: Record<string, unknown>;
+  /** If provided, use these messages instead of building from template + history + userMessage. */
+  overrideMessages?: unknown[];
   signal?: AbortSignal;
 }): AsyncIterable<string> {
   try {
@@ -184,6 +188,8 @@ export async function* fetchAIResponse(params: {
       history: rawHistory = [],
       userMessage,
       imagesBase64 = [],
+      extraBody,
+      overrideMessages,
       signal,
     } = params;
 
@@ -258,13 +264,17 @@ export async function* fetchAIResponse(params: {
     );
 
     if (messagesKey && Array.isArray(bodyObj[messagesKey])) {
-      const finalMessages = buildDynamicMessages(
-        bodyObj[messagesKey],
-        history,
-        userMessage,
-        imagesBase64
-      );
-      bodyObj[messagesKey] = finalMessages;
+      if (overrideMessages && Array.isArray(overrideMessages)) {
+        bodyObj[messagesKey] = overrideMessages;
+      } else {
+        const finalMessages = buildDynamicMessages(
+          bodyObj[messagesKey],
+          history,
+          userMessage,
+          imagesBase64
+        );
+        bodyObj[messagesKey] = finalMessages;
+      }
     }
 
     const allVariables = {
@@ -278,6 +288,10 @@ export async function* fetchAIResponse(params: {
     };
 
     bodyObj = deepVariableReplacer(bodyObj, allVariables);
+
+    if (extraBody && typeof extraBody === "object") {
+      bodyObj = { ...bodyObj, ...extraBody };
+    }
 
     if (messagesKey && Array.isArray(bodyObj[messagesKey])) {
       bodyObj[messagesKey] = coerceChatCompletionMessagesToTextContent(
@@ -436,6 +450,167 @@ export async function* fetchAIResponse(params: {
     throw new Error(
       `Error in fetchAIResponse: ${
         error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+export async function fetchAIResponseJson(params: {
+  provider: TYPE_PROVIDER | undefined;
+  selectedProvider: {
+    provider: string;
+    variables: Record<string, string>;
+  };
+  systemPrompt?: string;
+  history?: Message[];
+  userMessage: string;
+  imagesBase64?: string[];
+  extraBody?: Record<string, unknown>;
+  overrideMessages?: unknown[];
+  signal?: AbortSignal;
+}): Promise<any> {
+  const {
+    provider,
+    selectedProvider,
+    systemPrompt,
+    history: rawHistory = [],
+    userMessage,
+    imagesBase64 = [],
+    extraBody,
+    overrideMessages,
+    signal,
+  } = params;
+
+  if (signal?.aborted) {
+    throw new Error("Aborted");
+  }
+
+  const history = trimMessagesForApiContext(rawHistory);
+  const enhancedSystemPrompt = buildEnhancedSystemPrompt(systemPrompt);
+
+  const useFreelyAPI = await shouldUseFreelyAPI();
+  if (useFreelyAPI) {
+    throw new Error("Tool calls are not supported with Freely API yet");
+  }
+
+  if (!provider) throw new Error("Provider not provided");
+  if (!selectedProvider) throw new Error("Selected provider not provided");
+
+  let curlJson;
+  try {
+    curlJson = curl2Json(provider.curl);
+  } catch (error) {
+    throw new Error(
+      `Failed to parse curl: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+
+  const extractedVariables = extractVariables(provider.curl);
+  const requiredVars = extractedVariables.filter(
+    ({ key }) => key !== "SYSTEM_PROMPT" && key !== "TEXT" && key !== "IMAGE"
+  );
+  for (const { key } of requiredVars) {
+    if (
+      !selectedProvider.variables?.[key] ||
+      selectedProvider.variables[key].trim() === ""
+    ) {
+      throw new Error(
+        `Missing required variable: ${key}. Please configure it in settings.`
+      );
+    }
+  }
+
+  if (!userMessage) throw new Error("User message is required");
+  if (imagesBase64.length > 0 && !provider.curl.includes("{{IMAGE}}")) {
+    throw new Error(
+      `Provider ${provider?.id ?? "unknown"} does not support image input`
+    );
+  }
+
+  let bodyObj: any = curlJson.data ? JSON.parse(JSON.stringify(curlJson.data)) : {};
+  const messagesKey = Object.keys(bodyObj).find((key) =>
+    ["messages", "contents", "conversation", "history"].includes(key)
+  );
+
+  if (messagesKey && Array.isArray(bodyObj[messagesKey])) {
+    if (overrideMessages && Array.isArray(overrideMessages)) {
+      bodyObj[messagesKey] = overrideMessages;
+    } else {
+      bodyObj[messagesKey] = buildDynamicMessages(
+        bodyObj[messagesKey],
+        history,
+        userMessage,
+        imagesBase64
+      );
+    }
+  }
+
+  const allVariables = {
+    ...Object.fromEntries(
+      Object.entries(selectedProvider.variables).map(([key, value]) => [
+        key.toUpperCase(),
+        value,
+      ])
+    ),
+    SYSTEM_PROMPT: enhancedSystemPrompt || "",
+  };
+
+  bodyObj = deepVariableReplacer(bodyObj, allVariables);
+  if (extraBody && typeof extraBody === "object") {
+    bodyObj = { ...bodyObj, ...extraBody };
+  }
+
+  if (messagesKey && Array.isArray(bodyObj[messagesKey])) {
+    bodyObj[messagesKey] = coerceChatCompletionMessagesToTextContent(
+      bodyObj[messagesKey] as unknown[],
+      imagesBase64.length > 0
+    );
+  }
+
+  const url = deepVariableReplacer(curlJson.url || "", allVariables);
+  pruneUnsupportedReasoningEffort(bodyObj, { providerId: provider.id, url });
+
+  const headers = deepVariableReplacer(curlJson.header || {}, allVariables);
+  headers["Content-Type"] = "application/json";
+
+  // Force non-streaming for tool-call decision parsing.
+  const streamKey =
+    typeof bodyObj === "object" && bodyObj !== null
+      ? Object.keys(bodyObj).find((k) => k.toLowerCase() === "stream")
+      : undefined;
+  if (streamKey) {
+    bodyObj[streamKey] = false;
+  } else if (typeof bodyObj === "object" && bodyObj !== null) {
+    bodyObj.stream = false;
+  }
+
+  const response = await tauriFetch(url, {
+    method: curlJson.method || "POST",
+    headers,
+    body: curlJson.method === "GET" ? undefined : JSON.stringify(bodyObj),
+    signal,
+  });
+
+  if (!response.ok) {
+    let errorText = "";
+    try {
+      errorText = await response.text();
+    } catch {}
+    throw new Error(
+      `API request failed: ${response.status} ${response.statusText}${
+        errorText ? ` - ${errorText}` : ""
+      }`
+    );
+  }
+
+  try {
+    return await response.json();
+  } catch (e) {
+    throw new Error(
+      `Failed to parse non-streaming response: ${
+        e instanceof Error ? e.message : "Unknown error"
       }`
     );
   }

@@ -5,6 +5,7 @@ import { MAX_FILES } from "@/config";
 import { useApp } from "@/contexts";
 import {
   fetchAIResponse,
+  fetchAIResponseJson,
   saveConversation,
   getConversationById,
   generateConversationTitle,
@@ -32,6 +33,7 @@ interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: number;
+  sources?: Array<{ title: string; url: string; snippet?: string }>;
 }
 
 interface ChatConversation {
@@ -45,6 +47,8 @@ interface ChatConversation {
 interface CompletionState {
   input: string;
   response: string;
+  responseSources?: Array<{ title: string; url: string; snippet?: string }>;
+  isToolSearchingWeb?: boolean;
   isLoading: boolean;
   error: string | null;
   attachedFiles: AttachedFile[];
@@ -65,6 +69,8 @@ export const useCompletion = () => {
   const [state, setState] = useState<CompletionState>({
     input: "",
     response: "",
+    responseSources: undefined,
+    isToolSearchingWeb: false,
     isLoading: false,
     error: null,
     attachedFiles: [],
@@ -176,6 +182,7 @@ export const useCompletion = () => {
       const signal = abortControllerRef.current.signal;
 
       try {
+        const responseSettings = getResponseSettings();
         // Prepare message history for the AI
         const messageHistory = state.conversationHistory.map((msg) => ({
           role: msg.role,
@@ -193,6 +200,9 @@ export const useCompletion = () => {
         }
 
         let fullResponse = "";
+        let responseSources:
+          | Array<{ title: string; url: string; snippet?: string }>
+          | undefined = undefined;
 
         const useFreelyAPI = await shouldUseFreelyAPI();
         // Check if AI provider is configured
@@ -221,9 +231,144 @@ export const useCompletion = () => {
           isLoading: true,
           error: null,
           response: "",
+          responseSources: undefined,
+          isToolSearchingWeb: false,
         }));
 
         try {
+          // Tool-call phase (OpenAI-compatible `tools` / `tool_calls`)
+          if (!useFreelyAPI && responseSettings.enableToolCalls) {
+            const tools = [
+              {
+                type: "function",
+                function: {
+                  name: "web_search",
+                  description:
+                    "Search the web for up-to-date information and return a few relevant sources.",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      query: {
+                        type: "string",
+                        description: "The search query.",
+                      },
+                    },
+                    required: ["query"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+            ];
+
+            let firstJson: any;
+            try {
+              firstJson = await fetchAIResponseJson({
+                provider,
+                selectedProvider: selectedAIProvider,
+                systemPrompt: systemPrompt || undefined,
+                history: messageHistory as any,
+                userMessage: input,
+                imagesBase64,
+                extraBody: {
+                  tools,
+                  tool_choice: "auto",
+                },
+                signal,
+              });
+            } catch (toolErr) {
+              // If the provider/model rejects tool calling, fall back to normal chat.
+              firstJson = null;
+              setState((prev) => ({
+                ...prev,
+                error: `Tool calling failed (falling back): ${String(
+                  (toolErr as any)?.message || toolErr
+                )}`,
+              }));
+            }
+
+            const toolCalls =
+              firstJson?.choices?.[0]?.message?.tool_calls ??
+              firstJson?.choices?.[0]?.message?.toolCalls ??
+              [];
+
+            if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+              const first = toolCalls[0];
+              const fn = first?.function;
+              if (fn?.name === "web_search") {
+                let args: any = {};
+                try {
+                  args =
+                    typeof fn?.arguments === "string"
+                      ? JSON.parse(fn.arguments)
+                      : fn?.arguments ?? {};
+                } catch {
+                  args = {};
+                }
+
+                const query =
+                  typeof args?.query === "string" ? args.query : input;
+
+                // reflect in UI (simple)
+                setState((prev) => ({
+                  ...prev,
+                  response: "",
+                  responseSources: undefined,
+                  isToolSearchingWeb: true,
+                }));
+
+                const searchResp = (await invoke("web_search", {
+                  query,
+                })) as { sources?: Array<{ title: string; url: string; snippet?: string }> };
+                responseSources = Array.isArray(searchResp?.sources)
+                  ? searchResp.sources
+                  : undefined;
+                setState((prev) => ({
+                  ...prev,
+                  responseSources,
+                }));
+
+                // Follow-up messages for tool-calling: user -> assistant(tool_calls) -> tool(result)
+                const messagesForFinal = [
+                  ...(systemPrompt
+                    ? [{ role: "system", content: systemPrompt }]
+                    : []),
+                  ...messageHistory,
+                  { role: "user", content: input },
+                  { role: "assistant", content: "", tool_calls: toolCalls },
+                  {
+                    role: "tool",
+                    tool_call_id: first?.id,
+                    name: "web_search",
+                    content: JSON.stringify(searchResp),
+                  },
+                ];
+
+                // Stream the final answer
+                for await (const chunk of fetchAIResponse({
+                  provider,
+                  selectedProvider: selectedAIProvider,
+                  systemPrompt: systemPrompt || undefined,
+                  history: [],
+                  userMessage: "_",
+                  imagesBase64: [],
+                  overrideMessages: messagesForFinal as any[],
+                  signal,
+                })) {
+                  if (currentRequestIdRef.current !== requestId) return;
+                  if (signal.aborted) return;
+                  fullResponse += chunk;
+                  setState((prev) => ({
+                    ...prev,
+                    isToolSearchingWeb: false,
+                    response: prev.response + chunk,
+                  }));
+                }
+              }
+            }
+          }
+
+          // If tool-calling didn't run, use the normal streaming path.
+          if (!fullResponse) {
           // Use the fetchAIResponse function with signal
           for await (const chunk of fetchAIResponse({
             provider: useFreelyAPI ? undefined : provider,
@@ -250,13 +395,16 @@ export const useCompletion = () => {
               response: prev.response + chunk,
             }));
           }
+          }
         } catch (e: any) {
           // Only show error if this is still the current request and not aborted
           if (currentRequestIdRef.current === requestId && !signal.aborted) {
             setState((prev) => ({
               ...prev,
               isLoading: false,
-              error: e.message || "An error occurred",
+              error:
+                (e && typeof e === "object" && "message" in e && (e as any).message) ||
+                String(e || "An error occurred"),
             }));
           }
           return;
@@ -279,13 +427,15 @@ export const useCompletion = () => {
           await saveCurrentConversation(
             input,
             fullResponse,
-            state.attachedFiles
+            state.attachedFiles,
+            responseSources
           );
           // Clear input and attached files after saving
           setState((prev) => ({
             ...prev,
             input: "",
             attachedFiles: [],
+            responseSources,
           }));
         }
       } catch (error) {
@@ -328,6 +478,7 @@ export const useCompletion = () => {
       ...prev,
       input: "",
       response: "",
+      responseSources: undefined,
       error: null,
       attachedFiles: [],
     }));
@@ -378,7 +529,8 @@ export const useCompletion = () => {
     async (
       userMessage: string,
       assistantResponse: string,
-      _attachedFiles: AttachedFile[]
+      _attachedFiles: AttachedFile[],
+      sources?: Array<{ title: string; url: string; snippet?: string }>
     ) => {
       // Validate inputs
       if (!userMessage || !assistantResponse) {
@@ -402,6 +554,7 @@ export const useCompletion = () => {
         role: "assistant",
         content: assistantResponse,
         timestamp: timestamp + MESSAGE_ID_OFFSET,
+        sources: Array.isArray(sources) && sources.length > 0 ? sources : undefined,
       };
 
       const newMessages = [...state.conversationHistory, userMsg, assistantMsg];
@@ -1040,6 +1193,8 @@ export const useCompletion = () => {
     setInput,
     response: state.response,
     setResponse,
+    responseSources: state.responseSources,
+    isToolSearchingWeb: state.isToolSearchingWeb,
     isLoading: state.isLoading,
     error: state.error,
     attachedFiles: state.attachedFiles,

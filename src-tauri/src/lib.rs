@@ -65,6 +65,7 @@ pub fn run() {
             shortcuts::set_app_icon_visibility, shortcuts::set_always_on_top, shortcuts::exit_app,
             activate::secure_storage_save, activate::secure_storage_get, activate::secure_storage_remove,
             api::transcribe_audio, api::chat_stream_response, api::fetch_models, api::fetch_prompts,
+            api::web_search,
             api::create_system_prompt, speaker::start_system_audio_capture, speaker::stop_system_audio_capture,
             speaker::manual_stop_continuous, speaker::check_system_audio_access, speaker::request_system_audio_access,
             speaker::get_vad_config, speaker::update_vad_config, speaker::get_capture_status,

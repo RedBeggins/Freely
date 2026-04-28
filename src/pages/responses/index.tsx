@@ -2,6 +2,7 @@ import {
   ResponseLength,
   LanguageSelector,
   AutoScrollToggle,
+  ToolCallsToggle,
 } from "./components";
 import { PageLayout } from "@/layouts";
 
@@ -19,6 +20,9 @@ const Responses = () => {
 
       {/* Auto-Scroll Toggle */}
       <AutoScrollToggle />
+
+      {/* Tool Calls Toggle */}
+      <ToolCallsToggle />
     </PageLayout>
   );
 };
