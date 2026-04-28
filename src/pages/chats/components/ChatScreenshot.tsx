@@ -36,7 +36,14 @@ export const ChatScreenshot = ({
           ? "Screenshot not supported by current AI provider"
           : `${captureMode} mode (${processingMode}) - ${attachedFiles.length}/${MAX_FILES} files`
       }
-      onClick={captureScreenshot}
+      onClick={async () => {
+        try {
+          await captureScreenshot();
+        } catch (e) {
+          // captureScreenshot already reports errors via state, but keep this for debugging
+          console.error("ChatScreenshot click failed:", e);
+        }
+      }}
       disabled={
         attachedFiles.length >= MAX_FILES ||
         isLoading ||

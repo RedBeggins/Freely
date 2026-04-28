@@ -9,7 +9,6 @@ import {
   saveConversation,
   getConversationById,
   generateConversationTitle,
-  shouldUseFreelyAPI,
   MESSAGE_ID_OFFSET,
   generateConversationId,
   generateMessageId,
@@ -205,9 +204,7 @@ export const useCompletion = () => {
           | Array<{ title: string; url: string; snippet?: string }>
           | undefined = undefined;
 
-        const useFreelyAPI = await shouldUseFreelyAPI();
-        // Check if AI provider is configured
-        if (!selectedAIProvider.provider && !useFreelyAPI) {
+        if (!selectedAIProvider.provider) {
           setState((prev) => ({
             ...prev,
             error: "Please select an AI provider in settings",
@@ -218,7 +215,7 @@ export const useCompletion = () => {
         const provider = allAiProviders.find(
           (p) => p.id === selectedAIProvider.provider
         );
-        if (!provider && !useFreelyAPI) {
+        if (!provider) {
           setState((prev) => ({
             ...prev,
             error: "Invalid provider selected",
@@ -238,7 +235,7 @@ export const useCompletion = () => {
 
         try {
           // Tool-call phase (OpenAI-compatible `tools` / `tool_calls`)
-          if (!useFreelyAPI && responseSettings.enableToolCalls) {
+          if (responseSettings.enableToolCalls) {
             const tools = [
               {
                 type: "function",
@@ -372,7 +369,7 @@ export const useCompletion = () => {
           if (!fullResponse) {
           // Use the fetchAIResponse function with signal
           for await (const chunk of fetchAIResponse({
-            provider: useFreelyAPI ? undefined : provider,
+            provider,
             selectedProvider: selectedAIProvider,
             systemPrompt: systemPrompt || undefined,
             history: messageHistory,
@@ -755,9 +752,7 @@ export const useCompletion = () => {
 
             let fullResponse = "";
 
-            const useFreelyAPI = await shouldUseFreelyAPI();
-            // Check if AI provider is configured
-            if (!selectedAIProvider.provider && !useFreelyAPI) {
+            if (!selectedAIProvider.provider) {
               setState((prev) => ({
                 ...prev,
                 error: "Please select an AI provider in settings",
@@ -768,7 +763,7 @@ export const useCompletion = () => {
             const provider = allAiProviders.find(
               (p) => p.id === selectedAIProvider.provider
             );
-            if (!provider && !useFreelyAPI) {
+            if (!provider) {
               setState((prev) => ({
                 ...prev,
                 error: "Invalid provider selected",
@@ -787,7 +782,7 @@ export const useCompletion = () => {
 
             // Use the fetchAIResponse function with image and signal
             for await (const chunk of fetchAIResponse({
-              provider: useFreelyAPI ? undefined : provider,
+              provider,
               selectedProvider: selectedAIProvider,
               systemPrompt: systemPrompt || undefined,
               history: messageHistory,

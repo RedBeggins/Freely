@@ -18,7 +18,7 @@ export const ToolCallsToggle = () => {
   return (
     <div className="space-y-4">
       <Header
-        title="Tool Calls (Web Search)"
+        title="Tool Calls"
         description="Allow the model to call tools (OpenAI-compatible `tools` / `tool_calls`) such as web search. Requires Web Search to be enabled in Dev Space."
         isMainTitle
       />
@@ -35,9 +35,6 @@ export const ToolCallsToggle = () => {
           <p className="text-xs mt-2 text-amber-600 dark:text-amber-400">
             Warning: Many models reject `tools/tool_calls` and will return a 400
             error. Turn this off if you see API errors.
-          </p>
-          <p className="text-xs mt-2 text-muted-foreground">
-            Setup: Go to Dev Space → Web Search (Free) and enable it.
           </p>
         </div>
         <Switch

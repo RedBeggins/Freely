@@ -30,8 +30,8 @@ export const Header = ({
   return (
     <div
       className={cn(
-        `flex ${
-          rightSlot ? "flex-row justify-between items-center" : "flex-col"
+        `flex items-center ${
+          rightSlot ? "flex-row justify-between" : "flex-col items-start"
         } ${
           isMainTitle && (showBorder || !rightSlot)
             ? "border-b border-input/50 pb-2"

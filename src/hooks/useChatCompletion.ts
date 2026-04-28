@@ -6,7 +6,6 @@ import {
   saveConversation,
   getConversationById,
   generateConversationTitle,
-  shouldUseFreelyAPI,
   MESSAGE_ID_OFFSET,
   generateMessageId,
   generateRequestId,
@@ -29,6 +28,7 @@ interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: number;
+  attachedFiles?: AttachedFile[];
 }
 
 interface ChatConversation {
@@ -68,6 +68,12 @@ export const useChatCompletion = (
     error: null,
     attachedFiles: [],
   });
+
+  // Keep latest attached files available to async callbacks (e.g. screenshot auto-submit)
+  const attachedFilesRef = useRef<AttachedFile[]>([]);
+  useEffect(() => {
+    attachedFilesRef.current = state.attachedFiles;
+  }, [state.attachedFiles]);
 
   const [micOpen, setMicOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -162,18 +168,16 @@ export const useChatCompletion = (
 
         // Handle image attachments
         const imagesBase64: string[] = [];
-        if (state.attachedFiles.length > 0) {
-          state.attachedFiles.forEach((file) => {
+        const latestAttachedFiles = attachedFilesRef.current || [];
+        if (latestAttachedFiles.length > 0) {
+          latestAttachedFiles.forEach((file) => {
             if (file.type.startsWith("image/")) {
               imagesBase64.push(file.base64);
             }
           });
         }
 
-        const useFreelyAPI = await shouldUseFreelyAPI();
-
-        // Check if AI provider is configured
-        if (!selectedAIProvider.provider && !useFreelyAPI) {
+        if (!selectedAIProvider.provider) {
           setState((prev) => ({
             ...prev,
             error: "Please select an AI provider in settings",
@@ -185,7 +189,7 @@ export const useChatCompletion = (
           (p) => p.id === selectedAIProvider.provider
         );
 
-        if (!provider && !useFreelyAPI) {
+        if (!provider) {
           setState((prev) => ({
             ...prev,
             error: "Invalid provider selected",
@@ -200,6 +204,7 @@ export const useChatCompletion = (
           role: "user",
           content: input,
           timestamp,
+          attachedFiles: latestAttachedFiles.length ? latestAttachedFiles : undefined,
         };
 
         const updatedMessages = {
@@ -216,6 +221,7 @@ export const useChatCompletion = (
           error: null,
           attachedFiles: [],
         }));
+        attachedFilesRef.current = [];
 
         // Scroll to bottom after adding user message
         setTimeout(scrollToBottom, 100);
@@ -225,7 +231,7 @@ export const useChatCompletion = (
         try {
           // Use the fetchAIResponse function with signal for
           for await (const chunk of fetchAIResponse({
-            provider: useFreelyAPI ? undefined : provider,
+            provider,
             selectedProvider: selectedAIProvider,
             systemPrompt: systemPrompt || undefined,
             history: messageHistory,
@@ -440,11 +446,15 @@ export const useChatCompletion = (
           };
 
           // Store files temporarily and submit
-          setState((prev) => ({
-            ...prev,
-            attachedFiles: [...prev.attachedFiles, attachedFile],
-            input: prompt,
-          }));
+          setState((prev) => {
+            const nextFiles = [...prev.attachedFiles, attachedFile];
+            attachedFilesRef.current = nextFiles;
+            return {
+              ...prev,
+              attachedFiles: nextFiles,
+              input: prompt,
+            };
+          });
 
           // Submit with the prompt and screenshot
           setTimeout(() => submit(prompt), 100);
@@ -458,10 +468,14 @@ export const useChatCompletion = (
             size: base64.length,
           };
 
-          setState((prev) => ({
-            ...prev,
-            attachedFiles: [...prev.attachedFiles, attachedFile],
-          }));
+          setState((prev) => {
+            const nextFiles = [...prev.attachedFiles, attachedFile];
+            attachedFilesRef.current = nextFiles;
+            return {
+              ...prev,
+              attachedFiles: nextFiles,
+            };
+          });
         }
       } catch (error) {
         console.error("Failed to process screenshot:", error);
@@ -576,9 +590,11 @@ export const useChatCompletion = (
         await invoke("start_screen_capture");
       }
     } catch (error) {
+      console.error("Screenshot capture failed:", error);
+      const msg = error instanceof Error ? error.message : String(error);
       setState((prev) => ({
         ...prev,
-        error: "Failed to capture screenshot. Please try again.",
+        error: `Failed to capture screenshot. ${msg ? `(${msg})` : "Please try again."}`,
       }));
       isProcessingScreenshotRef.current = false;
       screenshotInitiatedByThisContext.current = false;

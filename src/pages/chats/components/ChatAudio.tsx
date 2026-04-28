@@ -16,7 +16,7 @@ export const ChatAudio = ({
   setIsRecording,
 }: ChatAudioProps) => {
   const { selectedSttProvider } = useApp();
-  const isProviderConfigured = selectedSttProvider.provider;
+  const isProviderConfigured = Boolean(selectedSttProvider.provider);
 
   const handleMicClick = () => {
     if (!isProviderConfigured) {
@@ -24,6 +24,8 @@ export const ChatAudio = ({
       return;
     }
 
+    // Close "provider required" popover if it was open
+    setMicOpen(false);
     setIsRecording(!isRecording);
   };
 
@@ -32,13 +34,13 @@ export const ChatAudio = ({
       <PopoverTrigger asChild>
         <Button
           size="icon"
-          variant="outline"
+          variant="ghost"
           onClick={handleMicClick}
-          className="size-7 lg:size-9 rounded-lg lg:rounded-xl"
-      title={isRecording ? "Recording..." : "Voice input"}
-    >
+          className="size-9 shrink-0 rounded-full bg-transparent hover:bg-muted/40"
+          title={isRecording ? "Recording..." : "Voice input"}
+        >
           <MicIcon
-            className={`size-3 lg:size-4 ${
+            className={`size-4 ${
               isRecording ? "text-red-500 animate-pulse" : ""
             }`}
           />

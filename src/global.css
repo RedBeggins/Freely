@@ -274,6 +274,27 @@ body {
   overflow-x: auto !important;
 }
 
+/* Chat bubble: remove top/bottom margins that vary by markdown node (headings, lists, etc.) */
+/* Streamdown often wraps content; cover common wrapper depths. */
+.chat-markdown > :first-child,
+.chat-markdown [data-streamdown] > :first-child,
+.chat-markdown [data-streamdown] > * > :first-child {
+  margin-top: 0 !important;
+}
+.chat-markdown > :last-child,
+.chat-markdown [data-streamdown] > :last-child,
+.chat-markdown [data-streamdown] > * > :last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Also ensure block elements don't introduce unexpected top spacing at the start. */
+.chat-markdown :where(h1, h2, h3, h4, h5, h6, p, ul, ol, pre, blockquote, table):first-child {
+  margin-top: 0 !important;
+}
+.chat-markdown :where(h1, h2, h3, h4, h5, h6, p, ul, ol, pre, blockquote, table):last-child {
+  margin-bottom: 0 !important;
+}
+
 [data-streamdown="code-block"] pre,
 [data-streamdown="code-block"] code {
   max-width: 100% !important;

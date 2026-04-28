@@ -1,53 +1,121 @@
 import { fetchSTT } from "@/lib";
 import { UseCompletionReturn } from "@/types";
-import { useMicVAD } from "@ricky0123/vad-react";
-import { LoaderCircleIcon, MicIcon, MicOffIcon } from "lucide-react";
-import { useState } from "react";
+import { LoaderCircleIcon, MicIcon, AlertCircleIcon } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components";
 import { useApp } from "@/contexts";
-import { floatArrayToWav } from "@/lib/utils";
-import { shouldUseFreelyAPI } from "@/lib/functions/freely.api";
 
 interface AutoSpeechVADProps {
   submit: UseCompletionReturn["submit"];
   setState: UseCompletionReturn["setState"];
   setEnableVAD: UseCompletionReturn["setEnableVAD"];
+  microphoneDeviceName?: string;
   microphoneDeviceId?: string;
 }
 
-const AutoSpeechVADInternal = ({
+const SILENCE_THRESHOLD = 0.008;
+const SILENCE_DURATION_MS = 1500;
+const MIN_SPEECH_DURATION_MS = 400;
+const VAD_FALLBACK_TIMEOUT_MS = 2000;
+const TIMER_DURATION_MS = 8000;
+
+async function resolveWebDeviceId(
+  nativeName?: string,
+  nativeId?: string
+): Promise<string | undefined> {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+
+    if (nativeName) {
+      const match = devices.find(
+        (d) =>
+          d.kind === "audioinput" &&
+          d.label.toLowerCase().includes(nativeName.toLowerCase())
+      );
+      if (match?.deviceId) return match.deviceId;
+    }
+
+    if (nativeId && nativeId !== "default") {
+      const idMatch = devices.find(
+        (d) => d.kind === "audioinput" && d.deviceId === nativeId
+      );
+      if (idMatch?.deviceId) return idMatch.deviceId;
+    }
+  } catch {
+    // enumerateDevices may fail before permission
+  }
+
+  return nativeId && nativeId !== "default" ? nativeId : undefined;
+}
+
+export const AutoSpeechVAD = ({
   submit,
   setState,
   setEnableVAD,
+  microphoneDeviceName,
   microphoneDeviceId,
 }: AutoSpeechVADProps) => {
-  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [status, setStatus] = useState<
+    "loading" | "listening" | "speaking" | "transcribing" | "error" | "timer"
+  >("loading");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { selectedSttProvider, allSttProviders } = useApp();
 
-  const audioConstraints: MediaTrackConstraints =
-    microphoneDeviceId && microphoneDeviceId !== "default"
-      ? { deviceId: { exact: microphoneDeviceId } }
-      : {};
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const rafRef = useRef<number | null>(null);
+  const silenceStartRef = useRef<number | null>(null);
+  const speechStartRef = useRef<number | null>(null);
+  const hasSpeechRef = useRef(false);
+  const mountedRef = useRef(true);
+  const timerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const modeRef = useRef<"vad" | "timer">("vad");
 
-  const vad = useMicVAD({
-    userSpeakingThreshold: 0.6,
-    startOnLoad: true,
-    additionalAudioConstraints: audioConstraints,
-    onSpeechEnd: async (audio) => {
+  const cleanup = useCallback(() => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    if (timerTimeoutRef.current) {
+      clearTimeout(timerTimeoutRef.current);
+      timerTimeoutRef.current = null;
+    }
+    if (mediaRecorderRef.current?.state === "recording") {
       try {
-        // convert float32array to blob
-        const audioBlob = floatArrayToWav(audio, 16000, "wav");
+        mediaRecorderRef.current.stop();
+      } catch {}
+    }
+    mediaRecorderRef.current = null;
+    if (audioContextRef.current?.state !== "closed") {
+      try {
+        audioContextRef.current?.close();
+      } catch {}
+    }
+    audioContextRef.current = null;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => {
+        t.stop();
+        t.enabled = false;
+      });
+      streamRef.current = null;
+    }
+  }, []);
 
-        let transcription: string;
-        const useFreelyAPI = await shouldUseFreelyAPI();
+  const handleSend = useCallback(
+    async (chunks: Blob[], mimeType: string) => {
+      if (!mountedRef.current) return;
+      setStatus("transcribing");
 
-        // Check if we have a configured speech provider
-        if (!selectedSttProvider.provider && !useFreelyAPI) {
-          console.warn("No speech provider selected");
+      try {
+        if (!chunks.length) throw new Error("No audio captured");
+        const audioBlob = new Blob(chunks, { type: mimeType });
+
+        if (!selectedSttProvider.provider) {
           setState((prev: any) => ({
             ...prev,
-            error:
-              "No speech provider selected. Please select one in settings.",
+            error: "No speech provider selected.",
           }));
           return;
         }
@@ -55,71 +123,331 @@ const AutoSpeechVADInternal = ({
         const providerConfig = allSttProviders.find(
           (p) => p.id === selectedSttProvider.provider
         );
-
-        if (!providerConfig && !useFreelyAPI) {
-          console.warn("Selected speech provider configuration not found");
+        if (!providerConfig) {
           setState((prev: any) => ({
             ...prev,
-            error:
-              "Speech provider configuration not found. Please check your settings.",
+            error: "Speech provider config not found.",
           }));
           return;
         }
 
-        setIsTranscribing(true);
-
-        // Use the fetchSTT function for all providers
-        transcription = await fetchSTT({
-          provider: useFreelyAPI ? undefined : providerConfig,
+        const transcription = await fetchSTT({
+          provider: providerConfig,
           selectedProvider: selectedSttProvider,
           audio: audioBlob,
         });
 
-        if (transcription) {
+        if (transcription && mountedRef.current) {
           submit(transcription);
         }
       } catch (error) {
-        console.error("Failed to transcribe audio:", error);
-        setState((prev: any) => ({
-          ...prev,
-          error:
-            error instanceof Error ? error.message : "Transcription failed",
-        }));
+        console.error("Transcription failed:", error);
+        if (mountedRef.current) {
+          setState((prev: any) => ({
+            ...prev,
+            error:
+              error instanceof Error ? error.message : "Transcription failed",
+          }));
+        }
       } finally {
-        setIsTranscribing(false);
+        if (mountedRef.current) {
+          setEnableVAD(false);
+        }
       }
     },
-  });
+    [selectedSttProvider, allSttProviders, submit, setState, setEnableVAD]
+  );
+
+  const startTimerMode = useCallback(
+    (recorder: MediaRecorder) => {
+      modeRef.current = "timer";
+      setStatus("timer");
+
+      timerTimeoutRef.current = setTimeout(() => {
+        if (recorder.state === "recording") {
+          recorder.stop();
+        }
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+      }, TIMER_DURATION_MS);
+    },
+    []
+  );
+
+  useEffect(() => {
+    mountedRef.current = true;
+    let cancelled = false;
+
+    const startListening = async () => {
+      try {
+        setState((prev: any) => ({
+          ...prev,
+          error: null,
+          response: "",
+        }));
+
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("getUserMedia not available in this webview");
+        }
+
+        const webDeviceId = await resolveWebDeviceId(microphoneDeviceName, microphoneDeviceId);
+        if (cancelled) return;
+
+        const audioBase: MediaTrackConstraints = {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        };
+
+        let stream: MediaStream;
+        try {
+          if (webDeviceId) {
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: { ...audioBase, deviceId: { exact: webDeviceId } },
+            });
+          } else {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: audioBase });
+          }
+        } catch {
+          try {
+            if (webDeviceId) {
+              stream = await navigator.mediaDevices.getUserMedia({
+                audio: { ...audioBase, deviceId: { ideal: webDeviceId } },
+              });
+            } else {
+              stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+          } catch {
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (micErr: any) {
+              throw new Error(
+                `Mic access denied: ${micErr?.name || ""} ${micErr?.message || micErr}`
+              );
+            }
+          }
+        }
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+
+        const track = stream.getAudioTracks()[0];
+        if (!track || track.muted || !track.enabled) {
+          throw new Error(
+            `Audio track issue: exists=${!!track}, muted=${track?.muted}, enabled=${track?.enabled}`
+          );
+        }
+
+        const preferredMimeTypes = [
+          "audio/webm;codecs=opus",
+          "audio/webm",
+          "audio/ogg;codecs=opus",
+        ];
+        const supportedMimeType = preferredMimeTypes.find((t) =>
+          MediaRecorder.isTypeSupported(t)
+        );
+
+        const recorder = supportedMimeType
+          ? new MediaRecorder(stream, { mimeType: supportedMimeType })
+          : new MediaRecorder(stream);
+
+        mediaRecorderRef.current = recorder;
+        chunksRef.current = [];
+
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) chunksRef.current.push(e.data);
+        };
+
+        recorder.onstop = () => {
+          if (chunksRef.current.length > 0) {
+            handleSend([...chunksRef.current], recorder.mimeType);
+          }
+        };
+
+        recorder.start(100);
+        if (cancelled) return;
+
+        // Try AudioContext-based VAD
+        let vadWorking = false;
+        try {
+          const audioContext = new AudioContext();
+          if (audioContext.state === "suspended") {
+            await audioContext.resume();
+          }
+          audioContextRef.current = audioContext;
+
+          const source = audioContext.createMediaStreamSource(stream);
+          const analyser = audioContext.createAnalyser();
+          analyser.fftSize = 2048;
+          analyser.smoothingTimeConstant = 0;
+          source.connect(analyser);
+
+          // Force the processing pipeline by connecting to destination via silent gain
+          const gainNode = audioContext.createGain();
+          gainNode.gain.value = 0;
+          analyser.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+
+          if (cancelled) return;
+
+          setStatus("listening");
+          silenceStartRef.current = null;
+          speechStartRef.current = null;
+          hasSpeechRef.current = false;
+
+          const dataArray = new Float32Array(analyser.fftSize);
+          let peakSeen = 0;
+          let frameCount = 0;
+          const vadCheckFrame = Math.ceil(
+            VAD_FALLBACK_TIMEOUT_MS / (1000 / 60)
+          );
+
+          const monitor = () => {
+            if (cancelled || !mountedRef.current) return;
+
+            analyser.getFloatTimeDomainData(dataArray);
+            let maxAmplitude = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+              const val = Math.abs(dataArray[i]);
+              if (val > maxAmplitude) maxAmplitude = val;
+            }
+
+            if (maxAmplitude > peakSeen) peakSeen = maxAmplitude;
+            frameCount++;
+
+            // After VAD_FALLBACK_TIMEOUT_MS, if we've never seen any signal, switch to timer mode
+            if (frameCount === vadCheckFrame && peakSeen < 0.0001) {
+              console.warn(
+                "AudioContext VAD not receiving data, switching to timer mode"
+              );
+              if (audioContextRef.current?.state !== "closed") {
+                try {
+                  audioContextRef.current?.close();
+                } catch {}
+              }
+              audioContextRef.current = null;
+              startTimerMode(recorder);
+              return;
+            }
+
+            const now = Date.now();
+            const isSpeaking = maxAmplitude > SILENCE_THRESHOLD;
+
+            if (isSpeaking) {
+              silenceStartRef.current = null;
+
+              if (!hasSpeechRef.current) {
+                hasSpeechRef.current = true;
+                speechStartRef.current = now;
+                setStatus("speaking");
+              }
+            } else if (hasSpeechRef.current) {
+              if (!silenceStartRef.current) {
+                silenceStartRef.current = now;
+              }
+
+              const speechDuration = speechStartRef.current
+                ? now - speechStartRef.current
+                : 0;
+              const silenceDuration = now - silenceStartRef.current;
+
+              if (
+                silenceDuration >= SILENCE_DURATION_MS &&
+                speechDuration >= MIN_SPEECH_DURATION_MS
+              ) {
+                if (recorder.state === "recording") {
+                  recorder.stop();
+                }
+                streamRef.current?.getTracks().forEach((t) => t.stop());
+                return;
+              }
+            }
+
+            rafRef.current = requestAnimationFrame(monitor);
+          };
+
+          rafRef.current = requestAnimationFrame(monitor);
+          vadWorking = true;
+        } catch (audioCtxErr) {
+          console.warn("AudioContext VAD failed, using timer mode:", audioCtxErr);
+        }
+
+        if (!vadWorking && !cancelled) {
+          startTimerMode(recorder);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        const msg =
+          error instanceof Error ? error.message : "Mic access failed";
+        console.error("Failed to start mic:", msg);
+        setStatus("error");
+        setErrorMsg(msg);
+        setState((prev: any) => ({
+          ...prev,
+          error: `Microphone error: ${msg}`,
+        }));
+      }
+    };
+
+    startListening();
+
+    return () => {
+      cancelled = true;
+      mountedRef.current = false;
+      cleanup();
+    };
+  }, [microphoneDeviceName, microphoneDeviceId, cleanup, handleSend, startTimerMode]);
+
+  const handleClick = () => {
+    if (modeRef.current === "timer" && mediaRecorderRef.current?.state === "recording") {
+      if (timerTimeoutRef.current) {
+        clearTimeout(timerTimeoutRef.current);
+        timerTimeoutRef.current = null;
+      }
+      mediaRecorderRef.current.stop();
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      return;
+    }
+
+    cleanup();
+    setState((prev: any) => ({ ...prev, response: "", error: null }));
+    setEnableVAD(false);
+  };
 
   return (
-    <>
-      <Button
-        size="icon"
-        onClick={() => {
-          if (vad.listening) {
-            vad.pause();
-            setEnableVAD(false);
-          } else {
-            vad.start();
-            setEnableVAD(true);
-          }
-        }}
-        className="cursor-pointer"
-      >
-        {isTranscribing ? (
-          <LoaderCircleIcon className="h-4 w-4 animate-spin text-green-500" />
-        ) : vad.userSpeaking ? (
-          <LoaderCircleIcon className="h-4 w-4 animate-spin" />
-        ) : vad.listening ? (
-          <MicOffIcon className="h-4 w-4 animate-pulse" />
-        ) : (
-          <MicIcon className="h-4 w-4" />
-        )}
-      </Button>
-    </>
+    <Button
+      size="icon"
+      onClick={handleClick}
+      className="cursor-pointer"
+      title={
+        status === "error"
+          ? `Error: ${errorMsg}`
+          : status === "loading"
+            ? "Starting microphone..."
+            : status === "transcribing"
+              ? "Transcribing..."
+              : status === "timer"
+                ? "Recording... click to send now"
+                : status === "speaking"
+                  ? "Speaking detected... will auto-send on pause"
+                  : "Listening... speak now (click to cancel)"
+      }
+    >
+      {status === "error" ? (
+        <AlertCircleIcon className="h-4 w-4 text-destructive" />
+      ) : status === "transcribing" ? (
+        <LoaderCircleIcon className="h-4 w-4 animate-spin text-green-500" />
+      ) : status === "loading" ? (
+        <LoaderCircleIcon className="h-4 w-4 animate-spin text-muted-foreground" />
+      ) : status === "timer" ? (
+        <MicIcon className="h-4 w-4 text-red-500 animate-pulse" />
+      ) : status === "speaking" ? (
+        <MicIcon className="h-4 w-4 text-red-500 animate-pulse" />
+      ) : (
+        <MicIcon className="h-4 w-4 animate-pulse text-red-500" />
+      )}
+    </Button>
   );
-};
-
-export const AutoSpeechVAD = (props: AutoSpeechVADProps) => {
-  return <AutoSpeechVADInternal key={props.microphoneDeviceId} {...props} />;
 };

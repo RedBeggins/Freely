@@ -7,6 +7,7 @@ export const PageLayout = ({
   rightSlot,
   allowBackButton = false,
   isMainTitle = true,
+  disableScrollArea = false,
 }: {
   children: React.ReactNode;
   title: string;
@@ -14,10 +15,11 @@ export const PageLayout = ({
   rightSlot?: React.ReactNode;
   allowBackButton?: boolean;
   isMainTitle?: boolean;
+  disableScrollArea?: boolean;
 }) => {
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="pt-8">
+    <div className="flex flex-1 flex-col min-h-0">
+      <header className="py-2 px-6 shrink-0">
         <Header
           isMainTitle={isMainTitle}
           showBorder={true}
@@ -28,9 +30,19 @@ export const PageLayout = ({
         />
       </header>
 
-      <ScrollArea className="h-[calc(100vh-5rem)] pr-6">
-        <div className="flex flex-col gap-6 pb-12 pt-4 px-1">{children}</div>
-      </ScrollArea>
+      {disableScrollArea ? (
+        <div className="flex-1 min-h-0 px-6">
+          <div className="flex flex-col gap-6 pb-12 pt-4 px-1 h-full min-h-0">
+            {children}
+          </div>
+        </div>
+      ) : (
+        <ScrollArea className="flex-1 min-h-0 px-6">
+          <div className="flex flex-col gap-6 pb-12 pt-4 px-1 min-h-full">
+            {children}
+          </div>
+        </ScrollArea>
+      )}
     </div>
   );
 };
