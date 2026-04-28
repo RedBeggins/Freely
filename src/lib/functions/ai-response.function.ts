@@ -1,9 +1,13 @@
 import {
   buildDynamicMessages,
+  coerceChatCompletionMessagesToTextContent,
   deepVariableReplacer,
   extractVariables,
   getByPath,
   getStreamingContent,
+  messageContentToApiString,
+  pruneUnsupportedReasoningEffort,
+  trimMessagesForApiContext,
 } from "./common.function";
 import { Message, TYPE_PROVIDER } from "@/types";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
@@ -65,13 +69,12 @@ async function* fetchFreelyAIResponse(params: {
       return;
     }
 
-    // Convert history to the expected format
+    // Convert history to the expected format (chronological: oldest → newest)
     let historyString: string | undefined;
     if (history.length > 0) {
-      // Create a copy before reversing to avoid mutating the original array
-      const formattedHistory = [...history].reverse().map((msg) => ({
+      const formattedHistory = history.map((msg) => ({
         role: msg.role,
-        content: [{ type: "text", text: msg.content }],
+        content: messageContentToApiString(msg.content),
       }));
       historyString = JSON.stringify(formattedHistory);
     }
@@ -178,7 +181,7 @@ export async function* fetchAIResponse(params: {
       provider,
       selectedProvider,
       systemPrompt,
-      history = [],
+      history: rawHistory = [],
       userMessage,
       imagesBase64 = [],
       signal,
@@ -188,6 +191,8 @@ export async function* fetchAIResponse(params: {
     if (signal?.aborted) {
       return;
     }
+
+    const history = trimMessagesForApiContext(rawHistory);
 
     const enhancedSystemPrompt = buildEnhancedSystemPrompt(systemPrompt);
 
@@ -273,7 +278,20 @@ export async function* fetchAIResponse(params: {
     };
 
     bodyObj = deepVariableReplacer(bodyObj, allVariables);
+
+    if (messagesKey && Array.isArray(bodyObj[messagesKey])) {
+      bodyObj[messagesKey] = coerceChatCompletionMessagesToTextContent(
+        bodyObj[messagesKey] as unknown[],
+        imagesBase64.length > 0
+      );
+    }
+
     let url = deepVariableReplacer(curlJson.url || "", allVariables);
+
+    pruneUnsupportedReasoningEffort(bodyObj, {
+      providerId: provider.id,
+      url,
+    });
 
     const headers = deepVariableReplacer(curlJson.header || {}, allVariables);
     headers["Content-Type"] = "application/json";
@@ -321,9 +339,16 @@ export async function* fetchAIResponse(params: {
       try {
         errorText = await response.text();
       } catch {}
+      const tpmHint =
+        response.status === 413 ||
+        errorText.includes("tokens") ||
+        errorText.includes("TPM") ||
+        errorText.includes("too large")
+          ? " Reduce conversation length or start a new chat; Groq free tier has strict per-request token limits."
+          : "";
       yield `API request failed: ${response.status} ${response.statusText}${
         errorText ? ` - ${errorText}` : ""
-      }`;
+      }${tpmHint}`;
       return;
     }
 

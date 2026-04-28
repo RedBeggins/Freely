@@ -40,6 +40,16 @@ export const CONVERSATION_SAVE_DEBOUNCE_MS = 500;
 export const CHUNK_POLL_INTERVAL_MS = 50;
 
 /**
+ * Limits for bundled chat requests (Groq free tier TPM / context caps).
+ * Rough guidance: ~4 characters ≈ 1 token for Latin script.
+ */
+export const API_HISTORY_MAX_MESSAGES = 24;
+/** Drop oldest turns until total history stays under this character budget */
+export const API_HISTORY_MAX_TOTAL_CHARS = 12000;
+/** Hard cap per message so one giant assistant reply cannot blow the budget */
+export const API_HISTORY_SINGLE_MESSAGE_MAX_CHARS = 6000;
+
+/**
  * DOWNLOAD_SUCCESS_DISPLAY_MS
  *
  * How long to show the "Downloaded successfully" checkmark/indicator

@@ -30,6 +30,7 @@ export const ShortcutRecorder = ({
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (!isRecording) return;
+      if (e.repeat) return;
 
       e.preventDefault();
       e.stopPropagation();

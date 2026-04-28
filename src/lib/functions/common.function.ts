@@ -1,4 +1,184 @@
 import { Message } from "@/types";
+import {
+  API_HISTORY_MAX_MESSAGES,
+  API_HISTORY_MAX_TOTAL_CHARS,
+  API_HISTORY_SINGLE_MESSAGE_MAX_CHARS,
+} from "../chat-constants";
+
+function messageCharLength(m: Message): number {
+  if (typeof m.content === "string") return m.content.length;
+  try {
+    return JSON.stringify(m.content).length;
+  } catch {
+    return 0;
+  }
+}
+
+function truncateSingleMessageContent(m: Message): Message {
+  if (typeof m.content !== "string") return m;
+  if (m.content.length <= API_HISTORY_SINGLE_MESSAGE_MAX_CHARS) return m;
+  return {
+    ...m,
+    content:
+      m.content.slice(0, API_HISTORY_SINGLE_MESSAGE_MAX_CHARS) +
+      "\n\n[…truncated]",
+  };
+}
+
+/**
+ * Shrinks conversation history so providers with strict TPM/context limits (e.g. Groq free tier)
+ * are less likely to reject the request.
+ */
+export function trimMessagesForApiContext(history: Message[]): Message[] {
+  if (!history?.length) return [];
+
+  let msgs = history.slice(-API_HISTORY_MAX_MESSAGES);
+
+  const sumChars = (arr: Message[]) =>
+    arr.reduce((s, m) => s + messageCharLength(m), 0);
+
+  while (msgs.length > 2 && sumChars(msgs) > API_HISTORY_MAX_TOTAL_CHARS) {
+    msgs = msgs.slice(2);
+  }
+  while (msgs.length > 1 && sumChars(msgs) > API_HISTORY_MAX_TOTAL_CHARS) {
+    msgs = msgs.slice(1);
+  }
+
+  msgs = msgs.map(truncateSingleMessageContent);
+
+  while (msgs.length > 1 && sumChars(msgs) > API_HISTORY_MAX_TOTAL_CHARS) {
+    msgs = msgs.slice(1);
+  }
+
+  return msgs;
+}
+
+/** Groq only accepts `reasoning_effort` on specific reasoning models (see console.groq.com/docs/reasoning). */
+export function groqModelSupportsReasoningEffort(modelId: string): boolean {
+  const m = modelId.trim().toLowerCase();
+  if (!m) return false;
+  if (m.includes("gpt-oss")) return true;
+  if (m.includes("qwen3-32b")) return true;
+  return false;
+}
+
+function groqReasoningEffortAllowedForModel(
+  modelId: string,
+  effort: unknown
+): boolean {
+  const m = modelId.trim().toLowerCase();
+  const e =
+    typeof effort === "string" ? effort.toLowerCase().trim() : "";
+  if (!e) return false;
+  if (m.includes("qwen3-32b")) {
+    return e === "none" || e === "default";
+  }
+  if (m.includes("gpt-oss")) {
+    return e === "low" || e === "medium" || e === "high";
+  }
+  return false;
+}
+
+/**
+ * Drops `reasoning_effort` when the request targets Groq but the model (or value)
+ * does not support it, avoiding 400 invalid_request_error.
+ */
+export function pruneUnsupportedReasoningEffort(
+  bodyObj: Record<string, unknown>,
+  context: { providerId?: string; url: string }
+): void {
+  if (
+    !bodyObj ||
+    typeof bodyObj !== "object" ||
+    !Object.prototype.hasOwnProperty.call(bodyObj, "reasoning_effort")
+  ) {
+    return;
+  }
+
+  const url = context.url.toLowerCase();
+  const isGroq =
+    context.providerId === "groq" || url.includes("api.groq.com");
+  if (!isGroq) return;
+
+  const modelRaw = bodyObj.model;
+  const modelId = typeof modelRaw === "string" ? modelRaw : "";
+
+  if (!groqModelSupportsReasoningEffort(modelId)) {
+    delete bodyObj.reasoning_effort;
+    return;
+  }
+
+  if (!groqReasoningEffortAllowedForModel(modelId, bodyObj.reasoning_effort)) {
+    delete bodyObj.reasoning_effort;
+  }
+}
+
+/** Flatten OpenAI-style message content to a plain string (no array/object). */
+export function messageContentToApiString(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (content == null) return "";
+  if (Array.isArray(content)) {
+    const texts = content
+      .filter(
+        (p: unknown) =>
+          p &&
+          typeof p === "object" &&
+          (p as { type?: string }).type === "text" &&
+          typeof (p as { text?: string }).text === "string"
+      )
+      .map((p: unknown) => (p as { text: string }).text);
+    return texts.join("\n");
+  }
+  if (typeof content === "object") {
+    try {
+      return JSON.stringify(content);
+    } catch {
+      return "";
+    }
+  }
+  return String(content);
+}
+
+/**
+ * Groq and some OpenAI-compatible APIs require `content` to be a string on every
+ * message unless the final user turn is true multimodal (text + image).
+ * Templates often emit `[{type:"text",text}]` even for text-only chats.
+ */
+export function coerceChatCompletionMessagesToTextContent(
+  messages: unknown[],
+  hasImagesInCurrentTurn: boolean
+): unknown[] {
+  if (!Array.isArray(messages)) return messages as unknown[];
+
+  return messages.map((raw, index) => {
+    if (!raw || typeof raw !== "object") return raw;
+    const m = raw as Record<string, unknown>;
+    const content = m.content;
+    const isLast = index === messages.length - 1;
+
+    if (typeof content === "string") {
+      return m;
+    }
+
+    if (!Array.isArray(content)) {
+      return { ...m, content: messageContentToApiString(content) };
+    }
+
+    const hasVisionPart = content.some(
+      (p: unknown) =>
+        p &&
+        typeof p === "object" &&
+        ((p as { type?: string }).type === "image_url" ||
+          (p as { type?: string }).type === "image")
+    );
+
+    if (isLast && hasVisionPart && hasImagesInCurrentTurn) {
+      return m;
+    }
+
+    return { ...m, content: messageContentToApiString(content) };
+  });
+}
 
 export function getByPath(obj: any, path: string): any {
   if (!path) return obj;
@@ -200,10 +380,42 @@ export function deepVariableReplacer(
  * @param defaultPath The default, non-streaming content path for the provider.
  * @returns The extracted text content, or null if not found.
  */
+function deltaContentToString(deltaContent: unknown): string | null {
+  if (typeof deltaContent === "string" && deltaContent.length > 0) {
+    return deltaContent;
+  }
+  if (Array.isArray(deltaContent)) {
+    const texts = deltaContent
+      .filter(
+        (p: unknown) =>
+          p &&
+          typeof p === "object" &&
+          (p as { type?: string }).type === "text" &&
+          typeof (p as { text?: string }).text === "string"
+      )
+      .map((p: unknown) => (p as { text: string }).text);
+    if (texts.length > 0) {
+      return texts.join("");
+    }
+  }
+  return null;
+}
+
 export function getStreamingContent(
   chunk: any,
   defaultPath: string
 ): string | null {
+  // OpenAI-compatible SSE (Groq, OpenAI, Mistral, etc.): only show assistant
+  // `delta.content`. Never use `reasoning_content` / `reasoning` / `thinking`.
+  const delta = chunk?.choices?.[0]?.delta;
+  if (delta != null && typeof delta === "object") {
+    const visible = deltaContentToString(delta.content);
+    if (visible) {
+      return visible;
+    }
+    return null;
+  }
+
   // A set of possible paths to check for streaming content.
   // Using a Set automatically handles duplicates.
   const possiblePaths = new Set([

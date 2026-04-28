@@ -17,6 +17,7 @@ import {
   CONVERSATION_SAVE_DEBOUNCE_MS,
   generateConversationId,
   generateMessageId,
+  isKeyboardShortcutContextConsumed,
 } from "@/lib";
 import { Message } from "@/types/completion";
 
@@ -833,6 +834,8 @@ export function useSystemAudio() {
     const handleRecordingShortcuts = (e: KeyboardEvent) => {
       if (!isPopoverOpen || !isContinuousMode) return;
       if (isProcessing || isAIProcessing) return;
+      if (e.repeat) return;
+      if (isKeyboardShortcutContextConsumed()) return;
 
       // Enter: Start recording (when not recording) or Stop & Send (when recording)
       if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
@@ -850,14 +853,12 @@ export function useSystemAudio() {
         ignoreContinuousRecording();
       }
 
-      // Space: Start recording (when not recording) - only if not typing in input
+      // Space: Start recording (when not recording)
       if (
         e.key === " " &&
         !isRecordingInContinuousMode &&
         !e.metaKey &&
-        !e.ctrlKey &&
-        !(e.target instanceof HTMLInputElement) &&
-        !(e.target instanceof HTMLTextAreaElement)
+        !e.ctrlKey
       ) {
         e.preventDefault();
         startContinuousRecording();

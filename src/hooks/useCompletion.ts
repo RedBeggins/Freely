@@ -730,6 +730,7 @@ export const useCompletion = () => {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.repeat) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (!state.isLoading && state.input.trim()) {
@@ -844,9 +845,10 @@ export const useCompletion = () => {
     const handleToggleShortcut = (e: KeyboardEvent) => {
       // Only trigger when popover is open
       if (!isPopoverOpen) return;
+      if (e.repeat) return;
 
-      // Check for Cmd+K (Mac) or Ctrl+K (Windows/Linux)
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      // Check for Cmd+K (Mac) or Ctrl+K (Windows/Linux); key is "K" with Caps Lock on some engines
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setKeepEngaged((prev) => !prev);
         // Focus the input after toggle (with delay to ensure DOM is ready)

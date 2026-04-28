@@ -16,6 +16,113 @@ let globalEventListeners: {
 // Global debounce for screenshot events to prevent duplicates
 let lastScreenshotEventTime = 0;
 
+// Ref-count: useGlobalShortcuts() is used from multiple hooks; only one IPC
+// listener set should exist (avoids StrictMode / multi-mount teardown races).
+let globalIpcListenerRefCount = 0;
+
+function teardownGlobalIpcListeners(): void {
+  const keys = [
+    "focus",
+    "audio",
+    "screenshot",
+    "systemAudio",
+    "customShortcut",
+    "registrationError",
+  ] as const satisfies readonly (keyof typeof globalEventListeners)[];
+
+  for (const key of keys) {
+    const fn = globalEventListeners[key];
+    if (fn) {
+      try {
+        fn();
+      } catch (error) {
+        console.warn(`Error cleaning up ${key} listener:`, error);
+      }
+      delete globalEventListeners[key];
+    }
+  }
+}
+
+async function setupGlobalIpcListenersOnce(): Promise<void> {
+  teardownGlobalIpcListeners();
+
+  const unlistenFocus = await listen("focus-text-input", () => {
+    setTimeout(() => {
+      if (globalInputRef) {
+        globalInputRef.focus();
+      }
+    }, 100);
+  });
+  globalEventListeners.focus = unlistenFocus;
+
+  const unlistenAudio = await listen("start-audio-recording", () => {
+    if (globalAudioCallback) {
+      globalAudioCallback();
+    }
+  });
+  globalEventListeners.audio = unlistenAudio;
+
+  const unlistenScreenshot = await listen("trigger-screenshot", () => {
+    const now = Date.now();
+    const timeSinceLastEvent = now - lastScreenshotEventTime;
+
+    if (timeSinceLastEvent < 300) {
+      return;
+    }
+
+    lastScreenshotEventTime = now;
+
+    if (globalScreenshotCallback) {
+      try {
+        Promise.resolve(globalScreenshotCallback())
+          .catch((error) => {
+            console.error("Screenshot shortcut callback failed:", error);
+          })
+          .then(() => {
+            // no-op
+          });
+      } catch (error) {
+        console.error("Failed to run screenshot shortcut callback:", error);
+      }
+    } else {
+      console.warn("Screenshot shortcut triggered but no callback registered.");
+    }
+  });
+  globalEventListeners.screenshot = unlistenScreenshot;
+
+  const unlistenSystemAudio = await listen("toggle-system-audio", () => {
+    if (globalSystemAudioCallback) {
+      globalSystemAudioCallback();
+    }
+  });
+  globalEventListeners.systemAudio = unlistenSystemAudio;
+
+  const unlistenCustomShortcut = await listen<{ action: string }>(
+    "custom-shortcut-triggered",
+    (event) => {
+      const actionId = event.payload.action;
+      const callback = globalCustomShortcutCallbacks.get(actionId);
+      if (callback) {
+        callback();
+      } else {
+        console.warn(`No callback registered for custom shortcut: ${actionId}`);
+      }
+    }
+  );
+  globalEventListeners.customShortcut = unlistenCustomShortcut;
+
+  const unlistenRegistrationError = await listen<
+    Array<[string, string, string]>
+  >("shortcut-registration-error", (event) => {
+    window.dispatchEvent(
+      new CustomEvent("shortcutRegistrationError", {
+        detail: event.payload,
+      })
+    );
+  });
+  globalEventListeners.registrationError = unlistenRegistrationError;
+}
+
 // Global callback refs
 let globalInputRef: HTMLInputElement | null = null;
 let globalAudioCallback: (() => void) | null = null;
@@ -108,151 +215,21 @@ export const useGlobalShortcuts = () => {
     globalCustomShortcutCallbacks.delete(actionId);
   }, []);
 
-  // Setup event listeners using global singleton
+  // Setup Tauri IPC listeners once across all useGlobalShortcuts() consumers.
   useEffect(() => {
-    const setupEventListeners = async () => {
-      try {
-        // Clean up any existing global listeners first
-        if (globalEventListeners.focus) {
-          try {
-            globalEventListeners.focus();
-          } catch (error) {
-            console.warn("Error cleaning up focus listener:", error);
-          }
-        }
-        if (globalEventListeners.audio) {
-          try {
-            globalEventListeners.audio();
-          } catch (error) {
-            console.warn("Error cleaning up audio listener:", error);
-          }
-        }
-        if (globalEventListeners.screenshot) {
-          try {
-            globalEventListeners.screenshot();
-          } catch (error) {
-            console.warn("Error cleaning up screenshot listener:", error);
-          }
-        }
-        if (globalEventListeners.systemAudio) {
-          try {
-            globalEventListeners.systemAudio();
-          } catch (error) {
-            console.warn("Error cleaning up system audio listener:", error);
-          }
-        }
-        if (globalEventListeners.customShortcut) {
-          try {
-            globalEventListeners.customShortcut();
-          } catch (error) {
-            console.warn("Error cleaning up custom shortcut listener:", error);
-          }
-        }
-        if (globalEventListeners.registrationError) {
-          try {
-            globalEventListeners.registrationError();
-          } catch (error) {
-            console.warn(
-              "Error cleaning up shortcut registration error listener:",
-              error
-            );
-          }
-        }
+    globalIpcListenerRefCount += 1;
+    if (globalIpcListenerRefCount === 1) {
+      void setupGlobalIpcListenersOnce().catch((error) => {
+        console.error("Failed to setup global shortcut IPC listeners:", error);
+      });
+    }
 
-        // Listen for focus text input event
-        const unlistenFocus = await listen("focus-text-input", () => {
-          setTimeout(() => {
-            if (globalInputRef) {
-              globalInputRef.focus();
-            }
-          }, 100);
-        });
-        globalEventListeners.focus = unlistenFocus;
-
-        // Listen for audio recording event
-        const unlistenAudio = await listen("start-audio-recording", () => {
-          if (globalAudioCallback) {
-            globalAudioCallback();
-          }
-        });
-        globalEventListeners.audio = unlistenAudio;
-
-        // Listen for screenshot trigger event with debouncing
-        const unlistenScreenshot = await listen("trigger-screenshot", () => {
-          const now = Date.now();
-          const timeSinceLastEvent = now - lastScreenshotEventTime;
-
-          // Debounce screenshot events (300ms minimum interval)
-          if (timeSinceLastEvent < 300) {
-            return;
-          }
-
-          lastScreenshotEventTime = now;
-
-          if (globalScreenshotCallback) {
-            try {
-              Promise.resolve(globalScreenshotCallback())
-                .catch((error) => {
-                  console.error("Screenshot shortcut callback failed:", error);
-                })
-                .then(() => {
-                  // no-op
-                });
-            } catch (error) {
-              console.error(
-                "Failed to run screenshot shortcut callback:",
-                error
-              );
-            }
-          } else {
-            console.warn(
-              "Screenshot shortcut triggered but no callback registered."
-            );
-          }
-        });
-        globalEventListeners.screenshot = unlistenScreenshot;
-
-        // Listen for system audio toggle event
-        const unlistenSystemAudio = await listen("toggle-system-audio", () => {
-          if (globalSystemAudioCallback) {
-            globalSystemAudioCallback();
-          }
-        });
-        globalEventListeners.systemAudio = unlistenSystemAudio;
-
-        // Listen for custom shortcut events
-        const unlistenCustomShortcut = await listen<{ action: string }>(
-          "custom-shortcut-triggered",
-          (event) => {
-            const actionId = event.payload.action;
-            const callback = globalCustomShortcutCallbacks.get(actionId);
-            if (callback) {
-              callback();
-            } else {
-              console.warn(
-                `No callback registered for custom shortcut: ${actionId}`
-              );
-            }
-          }
-        );
-        globalEventListeners.customShortcut = unlistenCustomShortcut;
-
-        const unlistenRegistrationError = await listen<
-          Array<[string, string, string]>
-        >("shortcut-registration-error", (event) => {
-          window.dispatchEvent(
-            new CustomEvent("shortcutRegistrationError", {
-              detail: event.payload,
-            })
-          );
-        });
-        globalEventListeners.registrationError = unlistenRegistrationError;
-      } catch (error) {
-        console.error("Failed to setup event listeners:", error);
+    return () => {
+      globalIpcListenerRefCount -= 1;
+      if (globalIpcListenerRefCount === 0) {
+        teardownGlobalIpcListeners();
       }
     };
-
-    setupEventListeners();
   }, []);
 
   return {

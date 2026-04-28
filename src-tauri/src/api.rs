@@ -678,12 +678,13 @@ pub async fn chat_stream_response(
                                 {
                                     if let Some(first_choice) = choices.first() {
                                         if let Some(delta) = first_choice.get("delta") {
+                                            // Only stream user-visible assistant text, never
+                                            // reasoning_content / chain-of-thought (OpenAI-compatible).
                                             if let Some(content) = delta
                                                 .get("content")
                                                 .and_then(|c| c.as_str())
                                             {
                                                 full_response.push_str(content);
-                                                // Emit just the content to frontend
                                                 let _ = app.emit("chat_stream_chunk", content);
                                                 stream_started = true;
                                             }

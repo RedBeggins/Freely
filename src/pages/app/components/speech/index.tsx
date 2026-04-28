@@ -81,9 +81,10 @@ export const SystemAudio = (props: useSystemAudioType) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isPopoverOpen) return;
+      if (e.repeat) return;
 
       // Cmd+K or Ctrl+K to toggle view mode
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setConversationMode((prev) => !prev);
       }

@@ -481,6 +481,7 @@ export const useChatCompletion = (
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.repeat) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (!state.isLoading && state.input.trim()) {
