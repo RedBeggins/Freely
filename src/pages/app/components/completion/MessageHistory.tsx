@@ -38,8 +38,25 @@ export const MessageHistory = ({
       viewport.scrollTop = viewport.scrollHeight;
     };
 
-    // Ensure the popover + scroll area have mounted and measured.
-    requestAnimationFrame(() => requestAnimationFrame(scrollToBottom));
+    // Content can grow after initial paint (Markdown, images). Do a few passes
+    // to reliably land at the bottom.
+    const raf1 = requestAnimationFrame(() => {
+      scrollToBottom();
+      const raf2 = requestAnimationFrame(() => {
+        scrollToBottom();
+        const raf3 = requestAnimationFrame(scrollToBottom);
+        const timeoutId = window.setTimeout(scrollToBottom, 120);
+
+        return () => {
+          cancelAnimationFrame(raf3);
+          window.clearTimeout(timeoutId);
+        };
+      });
+
+      return () => cancelAnimationFrame(raf2);
+    });
+
+    return () => cancelAnimationFrame(raf1);
   }, [messageHistoryOpen]);
 
   return (

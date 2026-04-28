@@ -934,6 +934,7 @@ export const useCompletion = () => {
 
   const isPopoverOpen =
     state.isLoading ||
+    Boolean(state.isToolSearchingWeb) ||
     state.response !== "" ||
     state.error !== null ||
     keepEngaged;
