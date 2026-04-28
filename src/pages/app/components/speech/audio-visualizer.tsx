@@ -207,7 +207,6 @@ export function AudioVisualizer({ stream, isRecording }: AudioVisualizerProps) {
     if (!canvas || !ctx || !analyserRef.current) return;
 
     const dpr = window.devicePixelRatio || 1;
-    ctx.scale(dpr, dpr);
 
     const analyser = analyserRef.current;
     const bufferLength = analyser.frequencyBinCount;
@@ -215,6 +214,10 @@ export function AudioVisualizer({ stream, isRecording }: AudioVisualizerProps) {
 
     const drawFrame = () => {
       animationFrameRef.current = requestAnimationFrame(drawFrame);
+
+      // Replace matrix each frame: avoids scale stacking across sessions, and
+      // restores DPR mapping after resize() resets the context.
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       // Get current frequency data
       analyser.getByteFrequencyData(frequencyData);

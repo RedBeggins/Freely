@@ -4,7 +4,17 @@
   "description": "Capability for the main window on Windows and Linux",
   "windows": ["main", "dashboard"],
   "platforms": ["windows", "linux"],
-"permissions": [
+  "remote": {
+    "urls": [
+      "http://localhost:1420/**",
+      "http://127.0.0.1:1420/**",
+      "http://localhost:1420/",
+      "http://127.0.0.1:1420/",
+      "http://tauri.localhost/**",
+      "https://tauri.localhost/**"
+    ]
+  },
+  "permissions": [
     "core:default",
     "opener:default",
     "updater:default",
@@ -17,11 +27,12 @@
     "global-shortcut:allow-unregister",
     "shell:allow-open",
     "core:window:allow-start-dragging",
-"core:window:allow-show",
+    "core:window:allow-show",
     "core:window:allow-hide",
     "core:window:allow-set-focus",
     "core:window:allow-is-visible",
     "core:window:allow-unminimize",
+    "core:window:allow-set-size",
     "sql:default",
     "sql:allow-execute",
     "posthog:default",

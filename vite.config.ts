@@ -21,7 +21,9 @@ export default defineConfig(async () => ({
   server: {
     port: 1420,
     strictPort: true,
-    host: host || false,
+    // Bind IPv4 explicitly: matches devUrl and avoids WebView2 resolving
+    // "localhost" to ::1 while Vite only listens on 127.0.0.1.
+    host: host || "127.0.0.1",
     hmr: host
       ? {
           protocol: "ws",

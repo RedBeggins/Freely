@@ -69,7 +69,9 @@ pub fn setup_global_shortcuts<R: Runtime>(
             poisoned.into_inner()
         }
     };
-    eprintln!("Global shortcuts state initialized, waiting for frontend config");
+    eprintln!(
+        "Global shortcuts plugin ready (bindings apply after the frontend calls update_shortcuts)."
+    );
 
     Ok(())
 }
