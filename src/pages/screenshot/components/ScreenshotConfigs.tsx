@@ -1,5 +1,4 @@
 import {
-  Label,
   Input,
   Select,
   SelectContent,

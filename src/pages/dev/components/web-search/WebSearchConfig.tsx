@@ -1,4 +1,4 @@
-import { Header, Switch } from "@/components";
+import { Switch } from "@/components";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 

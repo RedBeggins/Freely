@@ -38,7 +38,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "installer": "tauri build",
+    "dist": "tauri build"
   },
   "dependencies": {
     "@bany/curl-to-json": "^1.2.8",

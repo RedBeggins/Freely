@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Header, Button } from "@/components";
-import { Edit2, RotateCcw, CheckIcon } from "lucide-react";
+import { Header } from "@/components";
+import { Edit2, RotateCcw } from "lucide-react";
 import { ShortcutRecorder } from "./ShortcutRecorder";
 import {
   getAllShortcutActions,
