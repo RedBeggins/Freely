@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Header, Button } from "@/components";
-import { Edit2, RotateCcw } from "lucide-react";
+import { Edit2, RotateCcw, CheckIcon } from "lucide-react";
 import { ShortcutRecorder } from "./ShortcutRecorder";
 import {
   getAllShortcutActions,
@@ -18,7 +18,6 @@ export default function ShortcutManager() {
 
   const actions = getAllShortcutActions();
 
-  // Reload config when changed
   useEffect(() => {
     setConfig(getShortcutsConfig());
   }, []);
@@ -26,22 +25,17 @@ export default function ShortcutManager() {
   const handleSave = async (actionId: string, key: string) => {
     const updatedConfig = updateShortcutBinding(actionId, key);
     setConfig(updatedConfig);
-
-    // Send updated shortcuts to Tauri backend
     try {
       await invoke("update_shortcuts", { config: updatedConfig });
     } catch (error) {
       console.error("Failed to update shortcuts in backend:", error);
     }
-
     setEditingActionId(null);
   };
 
   const handleReset = async () => {
     const resetConfig = resetShortcutsToDefaults();
     setConfig(resetConfig);
-
-    // Send reset shortcuts to Tauri backend
     try {
       await invoke("update_shortcuts", { config: resetConfig });
     } catch (error) {
@@ -50,19 +44,21 @@ export default function ShortcutManager() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <Header
         title="Global Shortcuts"
-        description="Customize keyboard shortcuts for various actions"
-        isMainTitle
+        description="Keyboard shortcuts for quick access to Freely actions"
         rightSlot={
-          <Button variant="outline" size="sm" onClick={handleReset}>
-            <RotateCcw className="size-4 mr-2" />
-            Reset to Defaults
-          </Button>
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-foreground transition-colors"
+          >
+            <RotateCcw className="size-3" />
+            Reset
+          </button>
         }
       />
-      <div className="flex flex-col gap-4">
+      <div className="rounded-xl border border-border/50 divide-y divide-border/40">
         {actions.map((action: ShortcutAction) => {
           const binding = config.bindings[action.id];
           const isEditing = editingActionId === action.id;
@@ -70,15 +66,13 @@ export default function ShortcutManager() {
           return (
             <div
               key={action.id}
-              className="flex justify-between items-center bg-muted/20 p-3 rounded-lg border"
+              className="flex items-center justify-between px-4 py-3"
             >
               <div>
                 <p className="text-sm font-medium">{action.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {action.description}
-                </p>
+                <p className="text-xs text-muted-foreground">{action.description}</p>
               </div>
-              <div>
+              <div className="ml-4 shrink-0">
                 {isEditing ? (
                   <ShortcutRecorder
                     actionId={action.id}
@@ -86,17 +80,15 @@ export default function ShortcutManager() {
                     onCancel={() => setEditingActionId(null)}
                   />
                 ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="font-mono text-xs"
+                  <button
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground/70 hover:text-foreground transition-colors font-mono bg-muted/40 hover:bg-muted/70 px-2.5 py-1 rounded-md"
                     onClick={() => setEditingActionId(action.id)}
                   >
                     {binding?.key
                       ? formatShortcutKeyForDisplay(binding.key)
                       : "Unassigned"}
-                    <Edit2 className="size-3 ml-2 text-muted-foreground" />
-                  </Button>
+                    <Edit2 className="size-2.5" />
+                  </button>
                 )}
               </div>
             </div>

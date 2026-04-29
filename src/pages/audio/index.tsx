@@ -39,19 +39,14 @@ const Audio = () => {
     >
       <AudioSelection />
 
-      <div className="text-xs text-amber-600 bg-amber-500/10 p-3 rounded-md mb-4 space-y-2">
+      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-600/80 space-y-1.5">
         <p>
-          <strong>⚠️ If selected devices don't work:</strong> Please verify your
-          default system audio settings. Go to{" "}
-          <strong>{osInstructions.mic}</strong> for microphone and{" "}
-          <strong>{osInstructions.audio}</strong> for speakers/headphones.
-          Ensure the correct devices are set as default in your operating
-          system.
+          <strong>If selected devices don't work:</strong> Verify your default audio settings at{" "}
+          <strong>{osInstructions.mic}</strong> (mic) and{" "}
+          <strong>{osInstructions.audio}</strong> (output).
         </p>
-        <p className="text-amber-600/80">
-          <strong>Note:</strong> If the selected device fails or is unavailable,
-          Freely will automatically fall back to your system's default audio
-          devices.
+        <p>
+          Freely will fall back to system defaults if the selected device is unavailable.
         </p>
       </div>
     </PageLayout>

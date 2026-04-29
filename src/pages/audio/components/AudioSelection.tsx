@@ -3,36 +3,58 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  Header,
   Button,
 } from "@/components";
 import { MicIcon, RefreshCwIcon, HeadphonesIcon } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useApp } from "@/contexts";
 import { STORAGE_KEYS } from "@/config/constants";
 import { safeLocalStorage } from "@/lib/storage";
 import { invoke } from "@tauri-apps/api/core";
 
+const MarqueeText = ({ text }: { text: string }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  useEffect(() => {
+    const check = () => {
+      if (containerRef.current && textRef.current) {
+        setIsOverflowing(textRef.current.scrollWidth > containerRef.current.clientWidth);
+      }
+    };
+    check();
+    const observer = new ResizeObserver(check);
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [text]);
+
+  return (
+    <div ref={containerRef} className="overflow-hidden w-full">
+      {isOverflowing ? (
+        <span
+          ref={textRef}
+          className="marquee-text"
+          data-text={text}
+        >
+          {text}
+        </span>
+      ) : (
+        <span ref={textRef} className="whitespace-nowrap">{text}</span>
+      )}
+    </div>
+  );
+};
+
 export const AudioSelection = () => {
   const { selectedAudioDevices, setSelectedAudioDevices } = useApp();
 
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
-  const [showSuccess, setShowSuccess] = useState<{
-    input: boolean;
-    output: boolean;
-  }>({
-    input: false,
-    output: false,
-  });
   const [devices, setDevices] = useState<{
     input: { id: string; name: string; is_default: boolean }[];
     output: { id: string; name: string; is_default: boolean }[];
-  }>({
-    input: [],
-    output: [],
-  });
+  }>({ input: [], output: [] });
 
-  // Save devices to localStorage
   const saveToStorage = (newDevices: typeof selectedAudioDevices) => {
     safeLocalStorage.setItem(
       STORAGE_KEYS.SELECTED_AUDIO_DEVICES,
@@ -40,61 +62,33 @@ export const AudioSelection = () => {
     );
   };
 
-  // Load all audio devices (input and output)
   const loadAudioDevices = async () => {
     setIsLoadingDevices(true);
     try {
       const [inputDevices, outputDevices] = await Promise.all([
-        invoke<{ id: string; name: string; is_default: boolean }[]>(
-          "get_input_devices"
-        ),
-        invoke<{ id: string; name: string; is_default: boolean }[]>(
-          "get_output_devices"
-        ),
+        invoke<{ id: string; name: string; is_default: boolean }[]>("get_input_devices"),
+        invoke<{ id: string; name: string; is_default: boolean }[]>("get_output_devices"),
       ]);
 
       setDevices({
-        input:
-          inputDevices.map((input) => ({
-            id: input?.id,
-            name: input?.name,
-            is_default: input?.is_default,
-          })) || [],
-        output:
-          outputDevices.map((output) => ({
-            id: output?.id,
-            name: output?.name,
-            is_default: output?.is_default,
-          })) || [],
+        input: inputDevices.map((d) => ({ id: d.id, name: d.name, is_default: d.is_default })) || [],
+        output: outputDevices.map((d) => ({ id: d.id, name: d.name, is_default: d.is_default })) || [],
       });
 
-      // Only update if no device is currently selected or if the selected device doesn't exist
-      const currentInputExists = inputDevices.some(
-        (d) => d.id === selectedAudioDevices.input.id
-      );
-      const currentOutputExists = outputDevices.some(
-        (d) => d.id === selectedAudioDevices.output.id
-      );
+      const currentInputExists = inputDevices.some((d) => d.id === selectedAudioDevices.input.id) || selectedAudioDevices.input.id === "default";
+      const currentOutputExists = outputDevices.some((d) => d.id === selectedAudioDevices.output.id) || selectedAudioDevices.output.id === "default";
 
       if (!currentInputExists || !currentOutputExists) {
-        const defaultInput = inputDevices?.find((d) => d?.is_default);
-        const defaultOutput = outputDevices?.find((d) => d?.is_default);
-
         const newDevices = {
-          input: currentInputExists
-            ? selectedAudioDevices.input
-            : {
-                id: defaultInput?.id || inputDevices[0]?.id || "",
-                name: defaultInput?.name || inputDevices[0]?.name || "",
-              },
-          output: currentOutputExists
-            ? selectedAudioDevices.output
-            : {
-                id: defaultOutput?.id || outputDevices[0]?.id || "",
-                name: defaultOutput?.name || outputDevices[0]?.name || "",
-              },
+          input: currentInputExists ? selectedAudioDevices.input : {
+            id: "default",
+            name: "System Default",
+          },
+          output: currentOutputExists ? selectedAudioDevices.output : {
+            id: "default",
+            name: "System Default",
+          },
         };
-
         setSelectedAudioDevices(newDevices);
         saveToStorage(newDevices);
       }
@@ -109,222 +103,162 @@ export const AudioSelection = () => {
     loadAudioDevices();
   }, []);
 
-  // Handle device selection changes
   const handleDeviceChange = (type: "input" | "output", deviceId: string) => {
+    if (deviceId === "default") {
+      const newDevices = {
+        ...selectedAudioDevices,
+        [type]: { id: "default", name: "System Default" },
+      };
+      setSelectedAudioDevices(newDevices);
+      saveToStorage(newDevices);
+      return;
+    }
+
     const deviceList = type === "input" ? devices.input : devices.output;
     const selectedDevice = deviceList.find((d) => d.id === deviceId);
-
     if (!selectedDevice) return;
 
     const newDevices = {
       ...selectedAudioDevices,
       [type]: { id: deviceId, name: selectedDevice.name },
     };
-
     setSelectedAudioDevices(newDevices);
     saveToStorage(newDevices);
-
-    setShowSuccess((prev) => ({ ...prev, [type]: true }));
-    setTimeout(() => {
-      setShowSuccess((prev) => ({ ...prev, [type]: false }));
-    }, 3000);
   };
 
+  const RefreshButton = () => (
+    <Button
+      size="icon"
+      variant="ghost"
+      onClick={loadAudioDevices}
+      disabled={isLoadingDevices}
+      className="size-8 shrink-0 text-muted-foreground/60 hover:text-foreground"
+      title="Refresh devices"
+    >
+      <RefreshCwIcon className={`size-3.5 ${isLoadingDevices ? "animate-spin" : ""}`} />
+    </Button>
+  );
+
   return (
-    <div id="audio" className="space-y-1 flex flex-col gap-4">
-      {/* Microphone Input Section */}
-      <div className="space-y-3">
-        <Header
-          title="Microphone"
-          description="Select your microphone for voice input and speech-to-text. If issues occur, adjust your system's default microphone in OS settings."
-        />
-
-        <div className="space-y-3">
-          {/* Microphone Selection Dropdown */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Select
-                value={selectedAudioDevices.input.id}
-                onValueChange={(value) => handleDeviceChange("input", value)}
-                disabled={isLoadingDevices || devices?.input?.length === 0}
-              >
-                <SelectTrigger className="w-full h-11 border-1 border-input/50 focus:border-primary/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <MicIcon className="size-4" />
-                    <div className="text-sm font-medium truncate">
-                      {isLoadingDevices
-                        ? "Loading microphones..."
-                        : devices?.input?.length === 0
-                        ? "No microphones found"
-                        : devices?.input?.find(
-                            (mic) => mic?.id === selectedAudioDevices.input.id
-                          )?.name +
-                            (devices?.input?.find(
-                              (mic) => mic?.id === selectedAudioDevices.input.id
-                            )?.is_default
-                              ? " (Default)"
-                              : "") || "Select a microphone"}
-                    </div>
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  {devices?.input?.map((mic) => (
-                    <SelectItem key={mic?.id} value={mic?.id}>
-                      <div className="flex items-center gap-2">
-                        <MicIcon className="size-4" />
-                        <div className="font-medium truncate">{mic?.name} </div>
-                        {mic?.is_default && " (Default)"}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Refresh button */}
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={loadAudioDevices}
-                disabled={isLoadingDevices}
-                className="h-11 w-11 shrink-0"
-                title="Refresh microphone list"
-              >
-                <RefreshCwIcon
-                  className={`size-4 ${isLoadingDevices ? "animate-spin" : ""}`}
-                />
-              </Button>
-            </div>
-          </div>
-
-          {/* Success message */}
-          {showSuccess.input && (
-            <div className="text-xs text-green-500 bg-green-500/10 p-3 rounded-md">
-              <strong>✓ Microphone changed successfully!</strong>
-              <br />
-              Using: {selectedAudioDevices.input.name || "Unknown device"}
-            </div>
-          )}
-
-          {/* Permission Notice */}
-          {devices?.input?.length === 0 && !isLoadingDevices && (
-            <div className="text-xs text-amber-500 bg-amber-500/10 p-3 rounded-md">
-              <strong>
-                ⚠️ Click the refresh button to load your microphone devices.
-              </strong>{" "}
-              If this doesn't work, try changing your default microphone in your
-              system settings.
-            </div>
-          )}
-        </div>
-
-        {/* Tips */}
-        <div className="text-xs text-muted-foreground/70">
-          <p>
-            💡 <strong>Tip:</strong> When you select a microphone, the app will
-            immediately switch to that device. You can verify by hovering over
-            the microphone button in the main interface - it will show the
-            active device name.
+    <div id="audio" className="space-y-5">
+      {/* Microphone */}
+      <div className="flex items-center justify-between rounded-xl border border-border/50 px-4 py-3 relative overflow-hidden">
+        <div className="flex flex-col pr-4 min-w-0 flex-1">
+          <p className="text-sm font-medium">Microphone</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Input device for voice and speech-to-text
           </p>
         </div>
+        <div className="flex items-center gap-1 w-full max-w-[280px] min-w-0">
+          <Select
+            value={selectedAudioDevices.input.id}
+            onValueChange={(value) => handleDeviceChange("input", value)}
+            disabled={isLoadingDevices || devices?.input?.length === 0}
+          >
+            <SelectTrigger className="flex-1 h-10 border-border/50 overflow-hidden">
+              <div className="flex items-center gap-2 text-sm min-w-0 flex-1">
+                <MicIcon className="size-3.5 text-muted-foreground/60 shrink-0" />
+                <MarqueeText text={
+                  isLoadingDevices
+                    ? "Loading..."
+                    : devices?.input?.length === 0
+                    ? "No devices found"
+                    : selectedAudioDevices.input.id === "default"
+                    ? `System Default${devices?.input?.find(d => d.is_default) ? ` (${devices.input.find(d => d.is_default)?.name})` : ''}`
+                    : devices?.input?.find((d) => d?.id === selectedAudioDevices.input.id)?.name || "Select device"
+                } />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">
+                <div className="flex items-center gap-2">
+                  <MicIcon className="size-3.5" />
+                  <span className="truncate max-w-[200px]">
+                    System Default{devices?.input?.find(d => d.is_default) ? ` (${devices.input.find(d => d.is_default)?.name})` : ''}
+                  </span>
+                </div>
+              </SelectItem>
+              {devices?.input?.map((mic) => (
+                <SelectItem key={mic?.id} value={mic?.id}>
+                  <div className="flex items-center gap-2">
+                    <MicIcon className="size-3.5" />
+                    <span className="truncate max-w-[200px]">
+                      {mic?.name}{mic?.is_default && " (Default)"}
+                    </span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <RefreshButton />
+        </div>
+        
+        {/* Success/Error overlays */}
+        {devices?.input?.length === 0 && !isLoadingDevices && (
+          <div className="absolute inset-x-0 bottom-0 px-4 py-1.5 flex justify-center bg-amber-500/10 backdrop-blur-sm pointer-events-none border-t border-amber-500/20">
+            <span className="text-[10px] font-medium text-amber-600">No microphones found. Check system settings.</span>
+          </div>
+        )}
       </div>
 
-      {/* System Audio Output Section */}
-      <div className="space-y-3">
-        <Header
-          title="System Audio"
-          description="Select the output device to capture system sounds and application audio. If issues occur, set the correct default output in OS settings."
-        />
-
-        <div className="space-y-3">
-          {/* Output Selection Dropdown */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Select
-                value={selectedAudioDevices.output.id}
-                onValueChange={(value) => handleDeviceChange("output", value)}
-                disabled={isLoadingDevices || devices?.output?.length === 0}
-              >
-                <SelectTrigger className="w-full h-11 border-1 border-input/50 focus:border-primary/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <HeadphonesIcon className="size-4" />
-                    <div className="text-sm font-medium truncate">
-                      {isLoadingDevices
-                        ? "Loading output devices..."
-                        : devices?.output?.length === 0
-                        ? "No output devices found"
-                        : devices?.output?.find(
-                            (output) =>
-                              output?.id === selectedAudioDevices.output.id
-                          )?.name +
-                            (devices?.output?.find(
-                              (output) =>
-                                output?.id === selectedAudioDevices.output.id
-                            )?.is_default
-                              ? " (Default)"
-                              : "") || "Select an output device"}
-                    </div>
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  {devices?.output?.map((output) => (
-                    <SelectItem key={output?.id} value={output?.id}>
-                      <div className="flex items-center gap-2">
-                        <HeadphonesIcon className="size-4" />
-                        <div className="font-medium truncate">
-                          {output?.name} {output?.is_default && " (Default)"}
-                        </div>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Refresh button */}
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={loadAudioDevices}
-                disabled={isLoadingDevices}
-                className="h-11 w-11 shrink-0"
-                title="Refresh output device list"
-              >
-                <RefreshCwIcon
-                  className={`size-4 ${isLoadingDevices ? "animate-spin" : ""}`}
-                />
-              </Button>
-            </div>
-          </div>
-
-          {/* Success message */}
-          {showSuccess.output && (
-            <div className="text-xs text-green-500 bg-green-500/10 p-3 rounded-md">
-              <strong>✓ Output device changed successfully!</strong>
-              <br />
-              Using: {selectedAudioDevices.output.name || "Unknown device"}
-            </div>
-          )}
-
-          {/* Permission Notice */}
-          {devices?.output?.length === 0 && !isLoadingDevices && (
-            <div className="text-xs text-amber-500 bg-amber-500/10 p-3 rounded-md">
-              <strong>
-                ⚠️ Click the refresh button to load your system audio devices.
-              </strong>{" "}
-              If this doesn't work, try changing your default system audio
-              output in your system settings.
-            </div>
-          )}
-        </div>
-
-        {/* Tips */}
-        <div className="text-xs text-muted-foreground/70">
-          <p>
-            💡 <strong>Tip:</strong> System audio capture allows you to record
-            audio playing through your speakers or headphones. This is useful
-            for capturing conversation audio or system sounds along with your
-            voice.
+      {/* System Audio */}
+      <div className="flex items-center justify-between rounded-xl border border-border/50 px-4 py-3 relative overflow-hidden">
+        <div className="flex flex-col pr-4 min-w-0 flex-1">
+          <p className="text-sm font-medium">System Audio</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Output device to capture system sounds
           </p>
         </div>
+        <div className="flex items-center gap-1 w-full max-w-[280px] min-w-0">
+          <Select
+            value={selectedAudioDevices.output.id}
+            onValueChange={(value) => handleDeviceChange("output", value)}
+            disabled={isLoadingDevices || devices?.output?.length === 0}
+          >
+            <SelectTrigger className="flex-1 h-10 border-border/50 overflow-hidden">
+              <div className="flex items-center gap-2 text-sm min-w-0 flex-1">
+                <HeadphonesIcon className="size-3.5 text-muted-foreground/60 shrink-0" />
+                <MarqueeText text={
+                  isLoadingDevices
+                    ? "Loading..."
+                    : devices?.output?.length === 0
+                    ? "No devices found"
+                    : selectedAudioDevices.output.id === "default"
+                    ? `System Default${devices?.output?.find(d => d.is_default) ? ` (${devices.output.find(d => d.is_default)?.name})` : ''}`
+                    : devices?.output?.find((d) => d?.id === selectedAudioDevices.output.id)?.name || "Select device"
+                } />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">
+                <div className="flex items-center gap-2">
+                  <HeadphonesIcon className="size-3.5" />
+                  <span className="truncate max-w-[200px]">
+                    System Default{devices?.output?.find(d => d.is_default) ? ` (${devices.output.find(d => d.is_default)?.name})` : ''}
+                  </span>
+                </div>
+              </SelectItem>
+              {devices?.output?.map((output) => (
+                <SelectItem key={output?.id} value={output?.id}>
+                  <div className="flex items-center gap-2">
+                    <HeadphonesIcon className="size-3.5" />
+                    <span className="truncate max-w-[200px]">
+                      {output?.name}{output?.is_default && " (Default)"}
+                    </span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <RefreshButton />
+        </div>
+
+        {/* Success/Error overlays */}
+        {devices?.output?.length === 0 && !isLoadingDevices && (
+          <div className="absolute inset-x-0 bottom-0 px-4 py-1.5 flex justify-center bg-amber-500/10 backdrop-blur-sm pointer-events-none border-t border-amber-500/20">
+            <span className="text-[10px] font-medium text-amber-600">No output devices found. Check system settings.</span>
+          </div>
+        )}
       </div>
     </div>
   );

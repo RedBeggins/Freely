@@ -4,23 +4,17 @@ import {
   SPEECH_TO_TEXT_PROVIDERS,
   STORAGE_KEYS,
 } from "@/config";
-import { getPlatform, safeLocalStorage, trackAppStart } from "@/lib";
+import { safeLocalStorage, trackAppStart } from "@/lib";
 import {
   getCustomizableState,
   setCustomizableState,
-  updateAppIconVisibility,
-  updateAlwaysOnTop,
   updateAutostart,
   CustomizableState,
-  DEFAULT_CUSTOMIZABLE_STATE,
-  CursorType,
-  updateCursorType,
 } from "@/lib/storage";
 import { IContextType, ScreenshotConfig, TYPE_PROVIDER } from "@/types";
 import curl2Json from "@bany/curl-to-json";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { enable, disable } from "@tauri-apps/plugin-autostart";
 import {
   ReactNode,
@@ -90,8 +84,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
 
     return {
-      input: { id: "", name: "" },
-      output: { id: "", name: "" },
+      input: { id: "default", name: "System Default" },
+      output: { id: "default", name: "System Default" },
     };
   });
 
@@ -121,14 +115,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const [screenshotConfiguration, setScreenshotConfiguration] =
     useState<ScreenshotConfig>({
-      mode: "manual",
+      mode: "auto",
       autoPrompt: "Analyze this screenshot and provide insights",
       enabled: true,
     });
 
-  // Unified Customizable State
-  const [customizable, setCustomizable] = useState<CustomizableState>(
-    DEFAULT_CUSTOMIZABLE_STATE
+  // Unified Customizable State (lazy init avoids wrong toggle flash before loadData)
+  const [customizable, setCustomizable] = useState<CustomizableState>(() =>
+    getCustomizableState()
   );
   const [supportsImages, setSupportsImagesState] = useState<boolean>(() => {
     const stored = safeLocalStorage.getItem(STORAGE_KEYS.SUPPORTS_IMAGES);
@@ -160,11 +154,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const parsed = JSON.parse(savedScreenshotConfig);
         if (typeof parsed === "object" && parsed !== null) {
           setScreenshotConfiguration({
-            mode: parsed.mode || "manual",
+            mode: parsed.mode || "auto",
             autoPrompt:
               parsed.autoPrompt ||
               "Analyze this screenshot and provide insights",
-            enabled: parsed.enabled !== undefined ? parsed.enabled : false,
+            enabled: parsed.enabled !== undefined ? parsed.enabled : true,
           });
         }
       } catch {
@@ -210,33 +204,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const customizableState = getCustomizableState();
     setCustomizable(customizableState);
 
-    updateCursor(customizableState.cursor.type || "invisible");
+    updateCursor("default");
 
     const stored = safeLocalStorage.getItem(STORAGE_KEYS.CUSTOMIZABLE);
     if (!stored) {
-      // save the default state
       setCustomizableState(customizableState);
     } else {
-      // check if we need to update the schema
       try {
         const parsed = JSON.parse(stored);
-        let needsUpdate = false;
-
         if (!parsed.autostart) {
-          needsUpdate = true;
-        }
-
-        // Force update if the user's local storage contains the old defaults
-        if (parsed.alwaysOnTop?.isEnabled === false || parsed.appIcon?.isVisible === true) {
-          customizableState.alwaysOnTop.isEnabled = true;
-          customizableState.appIcon.isVisible = false;
-          needsUpdate = true;
-        }
-
-        if (needsUpdate) {
-          // save the merged state
           setCustomizableState(customizableState);
-          updateCursor(customizableState.cursor.type || "invisible");
         }
       } catch (error) {
         console.debug("Failed to check customizable state schema:", error);
@@ -259,27 +236,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateCursor = (type: CursorType | undefined) => {
+  const updateCursor = (_type: string | undefined) => {
     try {
-      const currentWindow = getCurrentWindow();
-      const platform = getPlatform();
-      // For Linux, always use default cursor
-      if (platform === "linux") {
-        document.documentElement.style.setProperty("--cursor-type", "default");
-        return;
-      }
-      const windowLabel = currentWindow.label;
-
-      if (windowLabel === "dashboard") {
-        // For dashboard, always use default cursor
-        document.documentElement.style.setProperty("--cursor-type", "default");
-        return;
-      }
-
-      // For overlay windows (main, capture-overlay-*)
-      const safeType = type || "invisible";
-      const cursorValue = type === "invisible" ? "none" : safeType;
-      document.documentElement.style.setProperty("--cursor-type", cursorValue);
+      document.documentElement.style.setProperty("--cursor-type", "default");
     } catch (error) {
       document.documentElement.style.setProperty("--cursor-type", "default");
     }
@@ -300,49 +259,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    // Load data
+    // Load data (persists migrated customizable keys before first-launch autostart)
     loadData();
-    initializeApp();
-  }, []);
 
-  // Handle customizable settings on state changes
-  useEffect(() => {
-    const applyCustomizableSettings = async () => {
-      try {
-        await Promise.all([
-          invoke("set_app_icon_visibility", {
-            visible: customizable.appIcon.isVisible,
-          }),
-          invoke("set_always_on_top", {
-            enabled: customizable.alwaysOnTop.isEnabled,
-          }),
-        ]);
-      } catch (error) {
-        console.error("Failed to apply customizable settings:", error);
-      }
-    };
-
-    applyCustomizableSettings();
-  }, [customizable]);
-
-  useEffect(() => {
-    const initializeAutostart = async () => {
+    const initFirstLaunchAutostart = async () => {
       try {
         const autostartInitialized = safeLocalStorage.getItem(
           STORAGE_KEYS.AUTOSTART_INITIALIZED
         );
-
-        // Only apply autostart on the very first launch
+        // Only synchronize OS launch-on-login once; must read storage after loadData().
         if (!autostartInitialized) {
-          const autostartEnabled = customizable?.autostart?.isEnabled ?? true;
-
-          if (autostartEnabled) {
+          const { autostart } = getCustomizableState();
+          if (autostart.isEnabled) {
             await enable();
           } else {
             await disable();
           }
-
-          // Mark as initialized so this never runs again
           safeLocalStorage.setItem(STORAGE_KEYS.AUTOSTART_INITIALIZED, "true");
         }
       } catch (error) {
@@ -350,30 +282,42 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    initializeAutostart();
+    void initFirstLaunchAutostart();
+
+    initializeApp();
+  }, []);
+
+  useEffect(() => {
+    const applyWindowDefaults = async () => {
+      try {
+        await Promise.all([
+          invoke("set_app_icon_visibility", { visible: false }),
+          invoke("set_always_on_top", { enabled: true }),
+        ]);
+      } catch (error) {
+        console.error("Failed to apply window defaults:", error);
+      }
+    };
+
+    applyWindowDefaults();
   }, []);
 
   // Listen for app icon hide/show events when window is toggled
   useEffect(() => {
-    const handleAppIconVisibility = async (isVisible: boolean) => {
+    const unlistenHide = listen("handle-app-icon-on-hide", async () => {
       try {
-        await invoke("set_app_icon_visibility", { visible: isVisible });
+        await invoke("set_app_icon_visibility", { visible: false });
       } catch (error) {
         console.error("Failed to set app icon visibility:", error);
-      }
-    };
-
-    const unlistenHide = listen("handle-app-icon-on-hide", async () => {
-      const currentState = getCustomizableState();
-      // Only hide app icon if user has set it to hide mode
-      if (!currentState.appIcon.isVisible) {
-        await handleAppIconVisibility(false);
       }
     });
 
     const unlistenShow = listen("handle-app-icon-on-show", async () => {
-      // Always show app icon when window is shown, regardless of user setting
-      await handleAppIconVisibility(true);
+      try {
+        await invoke("set_app_icon_visibility", { visible: true });
+      } catch (error) {
+        console.error("Failed to set app icon visibility:", error);
+      }
     });
 
     return () => {
@@ -503,28 +447,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Toggle handlers
-  const toggleAppIconVisibility = async (isVisible: boolean) => {
-    const newState = updateAppIconVisibility(isVisible);
-    setCustomizable(newState);
-    try {
-      await invoke("set_app_icon_visibility", { visible: isVisible });
-      loadData();
-    } catch (error) {
-      console.error("Failed to toggle app icon visibility:", error);
-    }
-  };
-
-  const toggleAlwaysOnTop = async (isEnabled: boolean) => {
-    const newState = updateAlwaysOnTop(isEnabled);
-    setCustomizable(newState);
-    try {
-      await invoke("set_always_on_top", { enabled: isEnabled });
-      loadData();
-    } catch (error) {
-      console.error("Failed to toggle always on top:", error);
-    }
-  };
-
   const toggleAutostart = async (isEnabled: boolean) => {
     const newState = updateAutostart(isEnabled);
     setCustomizable(newState);
@@ -534,7 +456,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       } else {
         await disable();
       }
-      loadData();
     } catch (error) {
       console.error("Failed to toggle autostart:", error);
       const revertedState = updateAutostart(!isEnabled);
@@ -542,11 +463,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const setCursorType = (type: CursorType) => {
-    setCustomizable((prev) => ({ ...prev, cursor: { type } }));
-    updateCursor(type);
-    updateCursorType(type);
-    loadData();
+  const setCursorType = (_type: string) => {
+    // Removed
   };
 
   // Create the context value (extend IContextType accordingly)
@@ -564,8 +482,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     screenshotConfiguration,
     setScreenshotConfiguration,
     customizable,
-    toggleAppIconVisibility,
-    toggleAlwaysOnTop,
     toggleAutostart,
     loadData,
     selectedAudioDevices,

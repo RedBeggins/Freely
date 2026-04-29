@@ -46,7 +46,6 @@
 
 :root {
   --radius: 0.625rem;
-  --cursor-type: default;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -239,10 +238,6 @@
   background: transparent !important;
 }
 
-* {
-  cursor: var(--cursor-type) !important;
-}
-
 html {
   overscroll-behavior: none;
 }
@@ -301,4 +296,27 @@ body {
   overflow-x: auto !important;
   word-wrap: break-word !important;
   white-space: pre-wrap !important;
+}
+
+@keyframes marquee-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.marquee-container {
+  overflow: hidden;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.marquee-text {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee-scroll 8s linear infinite;
+  padding-right: 3rem;
+}
+
+.marquee-text::after {
+  content: attr(data-text);
+  padding-left: 3rem;
 }

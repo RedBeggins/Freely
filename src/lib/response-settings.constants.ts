@@ -40,6 +40,12 @@ export const RESPONSE_LENGTHS: ResponseLengthOption[] = [
 
 export const LANGUAGES: LanguageOption[] = [
   {
+    id: "auto",
+    name: "Auto (match user)",
+    flag: "🌐",
+    prompt: "",
+  },
+  {
     id: "english",
     name: "English",
     flag: "🇺🇸",
@@ -216,5 +222,5 @@ export const LANGUAGES: LanguageOption[] = [
 ];
 
 export const DEFAULT_RESPONSE_LENGTH = "auto";
-export const DEFAULT_LANGUAGE = "english";
+export const DEFAULT_LANGUAGE = "auto";
 export const DEFAULT_AUTO_SCROLL = true;

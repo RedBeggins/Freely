@@ -1,9 +1,8 @@
-import { Card, Header } from "@/components";
+import { Selection } from "@/components";
 import { RESPONSE_LENGTHS } from "@/lib";
 import { updateResponseLength } from "@/lib/storage/response-settings.storage";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getResponseSettings } from "@/lib";
-import { CheckCircle2 } from "lucide-react";
 
 export const ResponseLength = () => {
   const [selectedLength, setSelectedLength] = useState<string>("auto");
@@ -18,38 +17,30 @@ export const ResponseLength = () => {
     updateResponseLength(lengthId);
   };
 
-  return (
-    <div className="space-y-4">
-      <Header
-        title="Response Length"
-        description="Control how detailed the AI responses should be. Changes apply to all new conversations and will influence how the AI structures responses"
-        isMainTitle
-      />
+  const lengthOptions = useMemo(() => {
+    return RESPONSE_LENGTHS.map((length) => ({
+      label: length.title,
+      value: length.id,
+    }));
+  }, []);
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {RESPONSE_LENGTHS.map((length) => (
-          <Card
-            key={length.id}
-            className={`relative p-4 border lg:border-2 shadow-none cursor-pointer transition-all ${
-              selectedLength === length.id
-                ? "border-primary"
-                : "border-border hover:border-primary/50"
-            }`}
-            onClick={() => handleLengthChange(length.id)}
-          >
-            <div className="space-y-1">
-              <h3 className="text-sm lg:text-md font-semibold">
-                {length.title}
-              </h3>
-              <p className="text-[10px] lg:text-xs text-muted-foreground">
-                {length.description}
-              </p>
-            </div>
-            {selectedLength === length.id && (
-              <CheckCircle2 className="size-5 text-green-500 flex-shrink-0 absolute top-2 right-2" />
-            )}
-          </Card>
-        ))}
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between rounded-xl border border-border/50 px-4 py-3">
+        <div className="flex flex-col pr-4 min-w-0 flex-1">
+          <p className="text-sm font-medium">Response Length</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            How detailed AI responses should be
+          </p>
+        </div>
+        <div className="w-full max-w-[280px] min-w-0">
+          <Selection
+            selected={selectedLength}
+            onChange={handleLengthChange}
+            options={lengthOptions}
+            placeholder="Select a length"
+          />
+        </div>
       </div>
     </div>
   );

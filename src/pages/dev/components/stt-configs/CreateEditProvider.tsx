@@ -1,7 +1,6 @@
 import {
   Card,
   Button,
-  Header,
   TextInput,
   Switch,
   Textarea,
@@ -44,23 +43,22 @@ export const CreateEditProvider = ({
             setErrors({});
           }}
           variant="outline"
-          className="w-full h-11 border-1 border-input/50 focus:border-primary/50 transition-colors"
+          className="w-full h-11 border-border/50 transition-colors"
         >
           <PlusIcon className="h-4 w-4 mr-2" />
           Add Custom STT Provider
         </Button>
       ) : (
-        <Card className="p-4 border border-input/50 bg-transparent">
-          <div className="flex justify-between items-center">
-            <Header
-              title={
-                editingProvider
-                  ? `Edit STT Provider`
-                  : "Add Custom STT Provider"
-              }
-              description="Create a custom STT provider to use with your STT-powered applications."
-            />
-            <div className="w-[120px]">
+        <Card className="p-5 border border-border/50 !bg-transparent space-y-5 rounded-xl">
+          {/* Header & Auto-fill */}
+          <div className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/20 px-4 py-3">
+            <div className="flex flex-col pr-4 min-w-0 flex-1">
+              <p className="text-sm font-medium">{editingProvider ? `Edit STT Provider` : "Add Custom STT Provider"}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Create a custom STT provider to use with your applications.
+              </p>
+            </div>
+            <div className="w-full max-w-[280px] min-w-0">
               <Selection
                 options={allSttProviders
                   ?.filter((provider) => !provider?.isCustom)
@@ -78,104 +76,75 @@ export const CreateEditProvider = ({
             </div>
           </div>
 
-          <div className="">
-            {/* Basic Configuration */}
-            <div className="space-y-1">
-              <Header
-                title="Curl Command *"
-                description="The curl command to use with the STT provider."
-              />
-              <Textarea
-                className={cn(
-                  "h-74 font-mono text-sm",
-                  errors.curl && "border-red-500"
-                )}
-                placeholder={`curl -X POST "https://api.openai.com/v1/audio/transcriptions" \\
+          {/* Curl Command */}
+          <div className="space-y-2">
+            <div className="flex flex-col px-1">
+              <p className="text-sm font-medium">Curl Command *</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                The curl command to use with the STT provider.
+              </p>
+            </div>
+            <Textarea
+              className={cn(
+                "h-72 font-mono text-sm border-border/50",
+                errors.curl && "border-red-500"
+              )}
+              placeholder={`curl -X POST "https://api.openai.com/v1/audio/transcriptions" \\
       -H "Authorization: Bearer {{API_KEY}}" \\
       -F "file={{AUDIO}}" \\
       -F "model={{MODEL}}"`}
-                value={formData.curl}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, curl: e.target.value }))
-                }
-              />
-              {errors.curl && (
-                <p className="text-xs text-red-500 mt-1">{errors.curl}</p>
-              )}
+              value={formData.curl}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, curl: e.target.value }))
+              }
+            />
+            {errors.curl && (
+              <p className="text-xs text-red-500 mt-1 px-1">{errors.curl}</p>
+            )}
 
-              {/* Variable Instructions */}
-              <div className="bg-muted/50 p-4 rounded-lg space-y-4">
-                <div className="bg-card border p-3 rounded-lg">
-                  <p className="text-sm font-medium text-primary mb-2">
-                    💡 Important: You can add custom variables or directly
-                    include your API keys/values
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    No need to enter variables separately when selecting the
-                    provider - you can embed them directly in the curl command
-                    (e.g., replace YOUR_API_KEY with your actual key or use{" "}
-                    <code className="bg-muted px-1 rounded text-xs">
-                      {"{{MODEL}}"}
-                    </code>{" "}
-                    for model name).
-                  </p>
-                </div>
+            {/* Variable Instructions */}
+            <div className="bg-muted/30 p-4 rounded-xl space-y-4 border border-border/30 mt-4">
+              <div className="bg-background/50 border border-border/40 p-3 rounded-lg">
+                <p className="text-sm font-medium mb-1">
+                  💡 Important: You can add custom variables or directly
+                  include your API keys/values
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  No need to enter variables separately when selecting the
+                  provider - you can embed them directly in the curl command
+                  (e.g., replace YOUR_API_KEY with your actual key or use{" "}
+                  <code className="bg-muted px-1 rounded text-xs">
+                    {"{{MODEL}}"}
+                  </code>{" "}
+                  for model name).
+                </p>
+              </div>
 
-                <h4 className="text-sm font-semibold text-foreground">
-                  ⚠️ Required Variables for STT Providers:
-                </h4>
-                <div className="grid grid-cols-1 gap-3 text-sm">
-                  <div className="flex items-center gap-3 p-3 bg-card border rounded-lg">
-                    <code className="bg-muted px-2 py-1 rounded font-mono text-xs">
-                      {"{{AUDIO}}"}
-                    </code>
-                    <span className="text-foreground font-medium">
-                      → REQUIRED: Base64 encoded audio data or audio file as wav
-                      file if you are using multipart/form-data (using -F or
-                      --form)
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    <strong className="text-foreground">Quick Setup:</strong>{" "}
-                    Replace{" "}
-                    <code className="bg-muted px-1 rounded text-xs">
-                      YOUR_API_KEY
-                    </code>{" "}
-                    with your actual API key directly in the curl command.
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    <strong className="text-foreground">
-                      Custom Variables:
-                    </strong>{" "}
-                    You can add your own variables using the same{" "}
-                    <code className="bg-muted px-1 rounded text-xs">
-                      {"{{VARIABLE_NAME}}"}
-                    </code>{" "}
-                    format and they'll be available for configuration when you
-                    select this provider.
-                  </p>
-                  <p className="text-xs text-muted-foreground italic">
-                    💡 Tip: The{" "}
-                    <code className="bg-muted px-1 rounded text-xs">
-                      {"{{AUDIO}}"}
-                    </code>{" "}
-                    variable is essential for STT functionality - make sure it's
-                    properly included in your curl command.
-                  </p>
+              <h4 className="text-sm font-semibold text-foreground px-1">
+                ⚠️ Required Variables for STT Providers:
+              </h4>
+              <div className="grid grid-cols-1 gap-2 text-sm">
+                <div className="flex items-center gap-3 px-3 py-2 bg-background/50 border border-border/40 rounded-lg">
+                  <code className="bg-muted px-2 py-0.5 rounded font-mono text-[10px]">
+                    {"{{AUDIO}}"}
+                  </code>
+                  <span className="text-xs font-medium">
+                    → REQUIRED: Base64 encoded audio data or audio file
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="space-y-0">
-            <div className="flex justify-between items-center space-x-2">
-              <Header
-                title="Streaming"
-                description="streaming is used to stream the response from the AI provider."
-              />
+          {/* Settings Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl border border-border/50 px-4 py-3">
+              <div className="flex flex-col pr-4 min-w-0 flex-1">
+                <p className="text-sm font-medium">Streaming</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Stream the response from the provider (Currently unsupported for STT).
+                </p>
+              </div>
               <Switch
                 checked={formData.streaming}
                 onCheckedChange={(checked) =>
@@ -187,37 +156,38 @@ export const CreateEditProvider = ({
                 disabled={true}
               />
             </div>
-            <span className="text-xs italic text-red-500">
-              Streaming is not supported for STT providers. it will be fixed in
-              the future.
-            </span>
-          </div>
-          {/* Response Configuration */}
-          <div className="space-y-2">
-            <Header
-              title="Response Content Path *"
-              description="The path to extract content from the API response."
-            />
 
-            <TextInput
-              placeholder="text"
-              value={formData.responseContentPath || ""}
-              onChange={(value) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  responseContentPath: value,
-                }))
-              }
-              error={errors.responseContentPath}
-              notes="The path to extract content from the API response. Examples: text, transcript, results[0].alternatives[0].transcript"
-            />
+            <div className="flex items-center justify-between rounded-xl border border-border/50 px-4 py-3">
+              <div className="flex flex-col pr-4 min-w-0 flex-1">
+                <p className="text-sm font-medium">Response Content Path *</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Path to extract content from response.
+                </p>
+              </div>
+              <div className="w-full max-w-[280px] min-w-0">
+                <TextInput
+                  placeholder="text"
+                  value={formData.responseContentPath || ""}
+                  onChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      responseContentPath: value,
+                    }))
+                  }
+                  error={errors.responseContentPath}
+                />
+              </div>
+            </div>
+            {errors.responseContentPath && (
+               <p className="text-xs text-red-500 mt-1 px-4">{errors.responseContentPath}</p>
+            )}
           </div>
 
-          <div className="flex justify-end gap-2 -mt-3">
+          <div className="flex justify-end gap-2 pt-2 border-t border-border/30">
             <Button
               variant="outline"
               onClick={() => setShowForm(!showForm)}
-              className="h-11 border-1 border-input/50 focus:border-primary/50 transition-colors"
+              className="h-10 border-border/50 transition-colors"
             >
               Cancel
             </Button>
@@ -225,7 +195,7 @@ export const CreateEditProvider = ({
               onClick={handleSave}
               disabled={!formData.curl.trim()}
               className={cn(
-                "h-11 border-1 border-input/50 focus:border-primary/50 transition-colors",
+                "h-10 transition-colors",
                 errors.curl && "bg-red-500 hover:bg-red-600 text-white"
               )}
             >

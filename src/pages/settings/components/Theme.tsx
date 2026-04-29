@@ -1,79 +1,33 @@
+import { Selection } from "@/components";
 import { useTheme } from "@/contexts";
-import { Header, Label, Button } from "@/components";
-import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components";
+
+const THEME_OPTIONS = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "system", label: "System" },
+];
 
 export const Theme = () => {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div id="theme" className="relative space-y-3">
-      <Header
-        title="Theme Customization"
-        description="Personalize your experience with custom theme and transparency settings"
-        isMainTitle
-      />
-
-      {/* Theme Toggle */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div>
-              <Label className="text-sm font-medium flex items-center gap-2">
-                {theme === "system" ? (
-                  <>
-                    <MonitorIcon className="h-4 w-4" />
-                    System
-                  </>
-                ) : theme === "light" ? (
-                  <>
-                    <SunIcon className="h-4 w-4" />
-                    Light Mode
-                  </>
-                ) : (
-                  <>
-                    <MoonIcon className="h-4 w-4" />
-                    Dark Mode
-                  </>
-                )}
-              </Label>
-              <p className="text-xs text-muted-foreground mt-1">
-                {theme === "light"
-                  ? "Using light theme for better visibility in bright environments"
-                  : "Using dark theme for comfortable viewing in low light"}
-              </p>
-            </div>
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                {theme === "system" ? (
-                  <MonitorIcon className="h-[1.2rem] w-[1.2rem]" />
-                ) : (
-                  <>
-                    <SunIcon className="h-[1.2rem] w-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
-                    <MoonIcon className="absolute h-[1.2rem] w-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
-                  </>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setTheme("light")}>
-                Light
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("dark")}>
-                Dark
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("system")}>
-                System
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+    <div id="theme" className="space-y-2">
+      <div className="flex items-center justify-between rounded-xl border border-border/50 px-4 py-3">
+        <div className="flex flex-col pr-4 min-w-0 flex-1">
+          <p className="text-sm font-medium">Theme</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Choose between light, dark, or system-matched appearance
+          </p>
+        </div>
+        <div className="w-full max-w-[280px] min-w-0">
+          <Selection
+            selected={theme}
+            onChange={(value: string) =>
+              setTheme(value as "light" | "dark" | "system")
+            }
+            options={THEME_OPTIONS}
+            placeholder="Select theme"
+          />
         </div>
       </div>
     </div>

@@ -1,9 +1,4 @@
-import {
-  Theme,
-  AlwaysOnTopToggle,
-  AppIconToggle,
-  AutostartToggle,
-} from "./components";
+import { Theme, AutostartToggle, TransparencySlider } from "./components";
 import { PageLayout } from "@/layouts";
 
 const Settings = () => {
@@ -12,14 +7,12 @@ const Settings = () => {
       {/* Theme */}
       <Theme />
 
+      {/* Background Transparency */}
+      <TransparencySlider />
+
       {/* Autostart Toggle */}
       <AutostartToggle />
 
-      {/* App Icon Toggle */}
-      <AppIconToggle />
-
-      {/* Always On Top Toggle */}
-      <AlwaysOnTopToggle />
     </PageLayout>
   );
 };

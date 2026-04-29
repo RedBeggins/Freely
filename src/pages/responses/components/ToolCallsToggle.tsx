@@ -1,4 +1,4 @@
-import { Switch, Label, Header } from "@/components";
+import { Switch } from "@/components";
 import { useEffect, useState } from "react";
 import { getResponseSettings, updateEnableToolCalls } from "@/lib";
 
@@ -16,35 +16,27 @@ export const ToolCallsToggle = () => {
   };
 
   return (
-    <div className="space-y-4">
-      <Header
-        title="Tool Calls"
-        description="Allow the model to call tools (OpenAI-compatible `tools` / `tool_calls`) such as web search. Requires Web Search to be enabled in Dev Space."
-        isMainTitle
-      />
-
-      <div className="flex items-center justify-between p-4 border rounded-xl">
-        <div className="pr-4">
-          <Label className="text-sm font-medium">
-            {enabled ? "Tool calls enabled" : "Tool calls disabled"}
-          </Label>
-          <p className="text-xs text-muted-foreground mt-1">
-            When enabled, the assistant may perform a tool call (like web search)
-            mid-response and then continue with sources.
-          </p>
-          <p className="text-xs mt-2 text-amber-600 dark:text-amber-400">
-            Warning: Many models reject `tools/tool_calls` and will return a 400
-            error. Turn this off if you see API errors.
+    <div className="space-y-2">
+      <div className="rounded-xl border border-border/50 divide-y divide-border/40">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex flex-col pr-4">
+            <p className="text-sm font-medium">Tool Calls</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Allow the model to call tools (OpenAI <code className="text-[10px] bg-muted px-1 rounded">tool_calls</code>) such as web search. Requires Web Search enabled in Dev Space.
+            </p>
+          </div>
+          <Switch
+            checked={enabled}
+            onCheckedChange={handleSwitchChange}
+            aria-label="Toggle tool calls"
+          />
+        </div>
+        <div className="px-4 py-2.5">
+          <p className="text-xs text-amber-500/80">
+            Many models reject <code className="text-[10px] bg-amber-500/10 px-1 rounded">tool_calls</code> and return a 400 error. Disable if you see API errors.
           </p>
         </div>
-        <Switch
-          checked={enabled}
-          onCheckedChange={handleSwitchChange}
-          title={`Toggle to ${!enabled ? "enable" : "disable"} tool calls`}
-          aria-label={`Toggle to ${enabled ? "disable" : "enable"} tool calls`}
-        />
       </div>
     </div>
   );
 };
-

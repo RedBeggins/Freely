@@ -1,4 +1,4 @@
-﻿import { Settings, Code, MessagesSquare, WandSparkles, AudioLinesIcon, SquareSlashIcon, MonitorIcon, MailIcon, BugIcon } from "lucide-react";
+﻿import { Settings, Code, MessagesSquare, WandSparkles, AudioLinesIcon, SquareSlashIcon, MonitorIcon, MailIcon, BugIcon, SlidersHorizontal } from "lucide-react";
 
 export const useMenuItems = () => {
   const menu = [
@@ -8,6 +8,7 @@ export const useMenuItems = () => {
     { icon: AudioLinesIcon, label: "Chats Audio", href: "/audio" },
     { icon: SquareSlashIcon, label: "Shortcuts", href: "/shortcuts" },
     { icon: MonitorIcon, label: "Screenshot", href: "/screenshot" },
+    { icon: SlidersHorizontal, label: "Settings", href: "/settings" },
     { icon: Code, label: "Dev Space", href: "/dev-space" },
   ];
 

@@ -1,19 +1,12 @@
 import { GripVerticalIcon } from "lucide-react";
-import { Button } from "@/components";
 
 export const DragButton = () => {
   return (
     <div
       data-tauri-drag-region
-      className="-ml-[2px]"
+      className="flex items-center justify-center cursor-grab text-muted-foreground/50 hover:text-foreground transition-colors h-9 px-1 -ml-1"
     >
-      <Button
-        variant="frosted"
-        size="icon"
-        className={`h-9 w-9 pointer-events-none rounded-full`}
-      >
-        <GripVerticalIcon className="h-4 w-4" />
-      </Button>
+      <GripVerticalIcon className="h-4 w-4 pointer-events-none" />
     </div>
   );
 };

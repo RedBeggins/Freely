@@ -1,13 +1,17 @@
-import { Badge, Input, Card, Empty } from "@/components";
+import { Badge, Input, Card, Empty, Button } from "@/components";
 import { useHistory } from "@/hooks";
 import { PageLayout } from "@/layouts";
-import { MessageCircleIcon, Search } from "lucide-react";
+import { MessageCircleIcon, Search, Trash2, CheckSquare, Square, X } from "lucide-react";
 import moment from "moment";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 
 const Dashboard = () => {
   const conversations = useHistory();
   const navigate = useNavigate();
+  const [selectMode, setSelectMode] = useState(false);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+
   // Group conversations by date
   const groupedConversations = conversations.conversations.reduce(
     (acc, doc) => {
@@ -26,10 +30,111 @@ const Dashboard = () => {
     moment(b).diff(moment(a))
   );
 
+  const allSelected =
+    conversations.conversations.length > 0 &&
+    conversations.selectedIds.size === conversations.conversations.length;
+
+  const handleExitSelectMode = () => {
+    setSelectMode(false);
+    conversations.clearSelection();
+  };
+
+  const handleDeleteSelected = async () => {
+    await conversations.deleteSelected();
+    if (conversations.conversations.length === 0) setSelectMode(false);
+  };
+
+  const handleDeleteAll = async () => {
+    await conversations.deleteAll();
+    setSelectMode(false);
+    setConfirmDeleteAll(false);
+  };
+
   return (
     <PageLayout
       title="All conversations"
       description="View all your conversations"
+      rightSlot={
+        conversations.conversations.length > 0 ? (
+          <div className="flex items-center gap-2">
+            {selectMode ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs h-7 gap-1.5"
+                  onClick={allSelected ? conversations.clearSelection : conversations.selectAll}
+                >
+                  {allSelected ? <Square className="size-3.5" /> : <CheckSquare className="size-3.5" />}
+                  {allSelected ? "Deselect all" : "Select all"}
+                </Button>
+                {conversations.selectedIds.size > 0 && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="text-xs h-7 gap-1.5"
+                    onClick={handleDeleteSelected}
+                  >
+                    <Trash2 className="size-3.5" />
+                    Delete ({conversations.selectedIds.size})
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs h-7"
+                  onClick={handleExitSelectMode}
+                >
+                  <X className="size-3.5" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-7 gap-1.5"
+                  onClick={() => setSelectMode(true)}
+                >
+                  <CheckSquare className="size-3.5" />
+                  Select
+                </Button>
+                {confirmDeleteAll ? (
+                  <>
+                    <span className="text-xs text-muted-foreground">Delete all?</span>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="text-xs h-7"
+                      onClick={handleDeleteAll}
+                    >
+                      Confirm
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7"
+                      onClick={() => setConfirmDeleteAll(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="text-xs h-7 gap-1.5"
+                    onClick={() => setConfirmDeleteAll(true)}
+                  >
+                    <Trash2 className="size-3.5" />
+                    Delete all
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        ) : undefined
+      }
     >
       <>
         {conversations.conversations.length === 0 ? (
@@ -67,27 +172,57 @@ const Dashboard = () => {
                     {moment(dateKey).format("ddd, MMM D")}
                   </p>
                   <div className="grid grid-cols-1 gap-3">
-                    {groupedConversations[dateKey].map((doc) => (
-                      <Card
-                        key={doc.id}
-                        className="shadow-none select-none p-4 gap-0 group relative transition-all !bg-black/5 dark:!bg-white/5 hover:!border-primary/50 cursor-pointer"
-                        onClick={() => navigate(`/chats/view/${doc.id}`)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <p className="line-clamp-1 text-sm mr-8">
-                            {doc.title}
-                          </p>
-                          <div className="flex items-center gap-1">
-                            <Badge variant="outline" className="text-xs">
-                              {doc.messages.length} messages
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {moment(doc.updatedAt).format("hh:mm A")}
-                            </Badge>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
+                    {groupedConversations[dateKey]
+                      .filter((doc) =>
+                        conversations?.search?.length === 0
+                          ? true
+                          : doc?.title
+                              .toLowerCase()
+                              .includes(conversations?.search?.toLowerCase() || "")
+                      )
+                      .map((doc) => {
+                        const isSelected = conversations.selectedIds.has(doc.id);
+                        return (
+                          <Card
+                            key={doc.id}
+                            className={`shadow-none select-none p-4 gap-0 group relative transition-all cursor-pointer ${
+                              isSelected
+                                ? "!border-primary/70 !bg-primary/5"
+                                : "!bg-black/5 dark:!bg-white/5 hover:!border-primary/50"
+                            }`}
+                            onClick={() => {
+                              if (selectMode) {
+                                conversations.toggleSelectId(doc.id);
+                              } else {
+                                navigate(`/chats/view/${doc.id}`);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              {selectMode && (
+                                <div className="mr-3 shrink-0">
+                                  {isSelected ? (
+                                    <CheckSquare className="size-4 text-primary" />
+                                  ) : (
+                                    <Square className="size-4 text-muted-foreground/50" />
+                                  )}
+                                </div>
+                              )}
+                              <p className="line-clamp-1 text-sm mr-8 flex-1">
+                                {doc.title}
+                              </p>
+                              <div className="flex items-center gap-1">
+                                <Badge variant="outline" className="text-xs">
+                                  {doc.messages.length} messages
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {moment(doc.updatedAt).format("hh:mm A")}
+                                </Badge>
+                              </div>
+                            </div>
+                          </Card>
+                        );
+                      })}
                   </div>
                 </div>
               ))}

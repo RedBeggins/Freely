@@ -34,7 +34,10 @@ export function ThemeProvider({
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
   );
-  const [transparency, setTransparency] = useState<number>(60);
+  const [transparency, setTransparency] = useState<number>(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.TRANSPARENCY);
+    return stored !== null ? parseInt(stored, 10) : 35;
+  });
 
   const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
   const isSystemThemeDark = mediaQuery.matches;
@@ -95,8 +98,9 @@ export function ThemeProvider({
     root.style.setProperty("--opacity", opacity.toString());
   }, [transparency]);
 
-  const onSetTransparency = (_transparency: number) => {
-    // transparency is hardcoded
+  const onSetTransparency = (value: number) => {
+    setTransparency(value);
+    localStorage.setItem(STORAGE_KEYS.TRANSPARENCY, value.toString());
   };
 
   const value = {

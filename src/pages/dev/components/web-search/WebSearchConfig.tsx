@@ -1,4 +1,4 @@
-import { Button, Header, Switch, Label } from "@/components";
+import { Header, Switch } from "@/components";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -9,7 +9,6 @@ type StorageResult = {
 export const WebSearchConfig = () => {
   const [enabled, setEnabled] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -22,54 +21,38 @@ export const WebSearchConfig = () => {
     })();
   }, []);
 
-  const save = async () => {
+  const handleCheckedChange = async (newValue: boolean) => {
+    setEnabled(newValue);
     setIsSaving(true);
-    setStatus(null);
     try {
       await invoke("secure_storage_save", {
         items: [
-          { key: "web_search_enabled", value: enabled ? "true" : "false" },
+          { key: "web_search_enabled", value: newValue ? "true" : "false" },
         ],
       });
-      setStatus("Saved.");
     } catch (e) {
-      setStatus(`Save failed: ${String((e as any)?.message || e)}`);
+      console.error("Save failed:", e);
+      setEnabled(!newValue);
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <div id="web-search" className="space-y-3">
-      <Header
-        title="Web Search (Free)"
-        description="Enable the built-in free web search tool (DuckDuckGo HTML). Tool calling depends on this being enabled."
-        isMainTitle
-      />
-
-      <div className="p-4 border rounded-xl space-y-3">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <Label className="text-sm font-medium">
-              {enabled ? "Web search enabled" : "Web search disabled"}
-            </Label>
-            <p className="text-xs text-muted-foreground mt-1">
-              If disabled, tool calling will fail for web search.
-            </p>
-          </div>
-          <Switch checked={enabled} onCheckedChange={setEnabled} />
+    <div id="web-search" className="space-y-2">
+      <div className="flex items-center justify-between rounded-xl border border-border/50 px-4 py-3">
+        <div className="flex flex-col pr-4">
+          <p className="text-sm font-medium">Web Search</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Built-in DuckDuckGo search tool. Required for tool calling to work.
+          </p>
         </div>
-
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-xs text-muted-foreground">
-            {status ? status : " "}
-          </div>
-          <Button onClick={save} disabled={isSaving} className="h-10">
-            {isSaving ? "Saving…" : "Save"}
-          </Button>
-        </div>
+        <Switch
+          checked={enabled}
+          onCheckedChange={handleCheckedChange}
+          disabled={isSaving}
+        />
       </div>
     </div>
   );
 };
-

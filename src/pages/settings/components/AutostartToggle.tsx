@@ -1,4 +1,4 @@
-import { Switch, Label, Header } from "@/components";
+import { Switch } from "@/components";
 import { useApp } from "@/contexts";
 
 interface AutostartToggleProps {
@@ -16,21 +16,12 @@ export const AutostartToggle = ({ className }: AutostartToggleProps) => {
 
   return (
     <div id="autostart" className={`space-y-2 ${className}`}>
-      <Header
-        title="Launch on Startup"
-        description="Automatically open Freely when your system starts"
-        isMainTitle
-      />
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div>
-            <Label className="text-sm font-medium">Open on Start</Label>
-            <p className="text-xs text-muted-foreground mt-1">
-              {isEnabled
-                ? "Freely will launch automatically on system startup"
-                : "Freely will not launch automatically"}
-            </p>
-          </div>
+      <div className="flex items-center justify-between rounded-xl border border-border/50 px-4 py-3">
+        <div className="flex flex-col pr-4">
+          <p className="text-sm font-medium">Launch on Startup</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Automatically open Freely when your system starts
+          </p>
         </div>
         <Switch
           checked={isEnabled}

@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import {
   getAllConversations,
   deleteConversation,
+  deleteAllConversations,
   DOWNLOAD_SUCCESS_DISPLAY_MS,
 } from "@/lib";
 import { ChatConversation } from "@/types/completion";
+import { listen } from "@tauri-apps/api/event";
 
 export type UseHistoryType = ReturnType<typeof useHistory>;
 
@@ -17,6 +19,14 @@ export interface UseHistoryReturn {
   deleteConfirm: string | null;
   isDownloaded: boolean;
   isAttached: boolean;
+
+  // Multi-select
+  selectedIds: Set<string>;
+  toggleSelectId: (id: string) => void;
+  selectAll: () => void;
+  clearSelection: () => void;
+  deleteSelected: () => Promise<void>;
+  deleteAll: () => Promise<void>;
 
   // Actions
   handleViewConversation: (conversation: ChatConversation) => void;
@@ -56,6 +66,7 @@ export function useHistory(): UseHistoryReturn {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [isAttached, setIsAttached] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Function to refresh conversations
   const refreshConversations = useCallback(async () => {
@@ -75,6 +86,29 @@ export function useHistory(): UseHistoryReturn {
   useEffect(() => {
     refreshConversations();
   }, [refreshConversations]);
+
+  // Sync in real-time when a conversation is saved from the main bar (cross-window via Tauri events)
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    listen<ChatConversation>("conversation-sync", (event) => {
+      const conversation = event.payload;
+      if (!conversation?.id) return;
+      setConversations((prev) => {
+        const exists = prev.some((c) => c.id === conversation.id);
+        if (exists) {
+          return prev.map((c) => (c.id === conversation.id ? conversation : c));
+        }
+        return [conversation, ...prev];
+      });
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      unlisten?.();
+    };
+  }, []);
 
   const handleViewConversation = (conversation: ChatConversation) => {
     setViewingConversation(conversation);
@@ -154,6 +188,46 @@ export function useHistory(): UseHistoryReturn {
     setDeleteConfirm(null);
   };
 
+  const toggleSelectId = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(conversations.map((c) => c.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  const deleteSelected = async () => {
+    try {
+      await Promise.all([...selectedIds].map((id) => deleteConversation(id)));
+      setConversations((prev) => prev.filter((c) => !selectedIds.has(c.id)));
+      selectedIds.forEach((id) => {
+        window.dispatchEvent(new CustomEvent("conversationDeleted", { detail: id }));
+      });
+      setSelectedIds(new Set());
+    } catch (error) {
+      console.error("Failed to delete selected conversations:", error);
+    }
+  };
+
+  const deleteAll = async () => {
+    try {
+      await deleteAllConversations();
+      setConversations([]);
+      setSelectedIds(new Set());
+      window.dispatchEvent(new CustomEvent("conversationDeleted", { detail: "all" }));
+    } catch (error) {
+      console.error("Failed to delete all conversations:", error);
+    }
+  };
+
   const handleAttachToOverlay = (conversationId: string) => {
     // Use localStorage to communicate between windows
     localStorage.setItem(
@@ -218,6 +292,14 @@ export function useHistory(): UseHistoryReturn {
     deleteConfirm,
     isDownloaded,
     isAttached,
+
+    // Multi-select
+    selectedIds,
+    toggleSelectId,
+    selectAll,
+    clearSelection,
+    deleteSelected,
+    deleteAll,
 
     // Actions
     handleViewConversation,

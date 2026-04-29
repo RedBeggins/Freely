@@ -172,8 +172,7 @@ pub fn create_dashboard_window<R: Runtime>(
         .min_inner_size(800.0, 600.0)
         .hidden_title(true)
         .title_bar_style(tauri::TitleBarStyle::Overlay)
-        // TODO: Reactivar content_protected(true) para producción - bloquea capturas de pantalla
-        .content_protected(false)
+        .content_protected(true)
         .visible(true)
         .traffic_light_position(LogicalPosition::new(14.0, 18.0));
 
@@ -184,8 +183,7 @@ pub fn create_dashboard_window<R: Runtime>(
         .decorations(true)
         .inner_size(800.0, 600.0)
         .min_inner_size(800.0, 600.0)
-        // TODO: Reactivar content_protected(true) para producción - bloquea capturas de pantalla
-        .content_protected(false)
+        .content_protected(true)
         .visible(false);
 
     let window = base_builder.build()?;

@@ -1,4 +1,4 @@
-import { Header, Selection } from "@/components";
+import { Selection } from "@/components";
 import { LANGUAGES } from "@/lib";
 import { updateLanguage } from "@/lib/storage/response-settings.storage";
 import { useState, useEffect, useMemo } from "react";
@@ -25,20 +25,22 @@ export const LanguageSelector = () => {
   }, []);
 
   return (
-    <div className="space-y-4">
-      <Header
-        title="Response Language"
-        description="Select the language for AI responses. Setting applies globally to all providers and conversations. Language support may vary depending on your selected LLM provider"
-        isMainTitle
-      />
-
-      <div className="max-w-md">
-        <Selection
-          selected={selectedLanguage}
-          onChange={handleLanguageChange}
-          options={languageOptions}
-          placeholder="Select a language"
-        />
+    <div className="space-y-2">
+      <div className="flex items-center justify-between rounded-xl border border-border/50 px-4 py-3">
+        <div className="flex flex-col pr-4 min-w-0 flex-1">
+          <p className="text-sm font-medium">Response Language</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Language for AI responses — applies to all providers and conversations
+          </p>
+        </div>
+        <div className="w-full max-w-[280px] min-w-0">
+          <Selection
+            selected={selectedLanguage}
+            onChange={handleLanguageChange}
+            options={languageOptions}
+            placeholder="Select a language"
+          />
+        </div>
       </div>
     </div>
   );

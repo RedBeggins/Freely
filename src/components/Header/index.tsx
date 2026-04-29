@@ -34,7 +34,7 @@ export const Header = ({
           rightSlot ? "flex-row justify-between" : "flex-col items-start"
         } ${
           isMainTitle && (showBorder || !rightSlot)
-            ? "border-b border-input/50 pb-2"
+            ? "border-b border-input/30 pb-3"
             : ""
         }`,
         className
@@ -46,23 +46,23 @@ export const Header = ({
             <ArrowLeftIcon className="size-3 lg:size-4 transition-all duration-300" />
           </Button>
         )}
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-0.5">
           <Label
             className={`${cn(
               "font-semibold line-clamp-1",
               isMainTitle
-                ? "text-md lg:text-lg"
-                : "text-xs lg:text-sm transition-all duration-300"
+                ? "text-base lg:text-lg"
+                : "text-xs font-medium text-foreground/80 uppercase tracking-wide transition-all duration-300"
             )} ${titleClassName}`}
           >
             {title}
           </Label>
           <p
             className={cn(
-              `select-none text-muted-foreground leading-relaxed ${
+              `select-none leading-relaxed ${
                 isMainTitle
-                  ? "text-xs lg:text-sm"
-                  : "text-[10px] lg:text-xs transition-all duration-300"
+                  ? "text-xs lg:text-sm text-muted-foreground"
+                  : "text-[10px] text-muted-foreground/60 transition-all duration-300"
               } ${descriptionClassName}`
             )}
           >

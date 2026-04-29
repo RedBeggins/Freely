@@ -1,6 +1,6 @@
 import { Dispatch, SetStateAction } from "react";
 import { ScreenshotConfig, TYPE_PROVIDER } from "@/types";
-import { CursorType, CustomizableState } from "@/lib/storage";
+import { CustomizableState } from "@/lib/storage";
 
 export type IContextType = {
   systemPrompt: string;
@@ -36,8 +36,6 @@ export type IContextType = {
     React.SetStateAction<ScreenshotConfig>
   >;
   customizable: CustomizableState;
-  toggleAppIconVisibility: (isVisible: boolean) => Promise<void>;
-  toggleAlwaysOnTop: (isEnabled: boolean) => Promise<void>;
   toggleAutostart: (isEnabled: boolean) => Promise<void>;
   loadData: () => void;
   selectedAudioDevices: {
@@ -50,7 +48,7 @@ export type IContextType = {
       output: { id: string; name: string };
     }>
   >;
-  setCursorType: (type: CursorType) => void;
+  setCursorType: (type: string) => void;
   supportsImages: boolean;
   setSupportsImages: (value: boolean) => void;
 };

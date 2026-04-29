@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Freely",
-  "version": "0.1.9",
+  "version": "1.0.0",
   "identifier": "com.srikanthnani.freely",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -25,7 +25,7 @@
         "skipTaskbar": true,
         "visible": true,
         "center": false,
-        "contentProtected": false,
+        "contentProtected": true,
         "focus": false,
         "acceptFirstMouse": true,
         "shadow": false

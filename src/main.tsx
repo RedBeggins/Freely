@@ -6,6 +6,8 @@ import "./global.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import AppRoutes from "./routes";
 
+document.addEventListener("contextmenu", (e) => e.preventDefault());
+
 let windowLabel = "main";
 try {
   const currentWindow = getCurrentWindow();

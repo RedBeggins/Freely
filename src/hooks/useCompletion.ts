@@ -16,7 +16,7 @@ import {
   getResponseSettings,
 } from "@/lib";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 
 // Types for completion
 interface AttachedFile {
@@ -589,6 +589,8 @@ export const useCompletion = () => {
 
       try {
         await saveConversation(conversation);
+
+        emit("conversation-sync", conversation);
 
         setState((prev) => ({
           ...prev,

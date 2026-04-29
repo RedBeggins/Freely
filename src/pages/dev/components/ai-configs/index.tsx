@@ -5,17 +5,19 @@ import { CustomProviders } from "./CustomProvider";
 
 export const AIProviders = (settings: UseSettingsReturn) => {
   return (
-    <div id="ai-providers" className="space-y-3">
+    <div id="ai-providers" className="space-y-2">
       <Header
         title="AI Providers"
-        description="Select your preferred AI service provider to get started."
-        isMainTitle
+        description="Select your preferred AI service provider"
       />
-
-      {/* Custom Provider */}
-      <CustomProviders {...settings} />
-      {/* Providers Selection */}
-      <Providers {...settings} />
+      <div className="rounded-xl border border-border/50 divide-y divide-border/40">
+        <div className="px-4 py-4 space-y-4">
+          <CustomProviders {...settings} />
+        </div>
+        <div className="px-4 py-4">
+          <Providers {...settings} />
+        </div>
+      </div>
     </div>
   );
 };
