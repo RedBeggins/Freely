@@ -35,7 +35,7 @@
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "shortDescription": "Privacy-first AI desktop overlay for meetings and everyday work.",
     "longDescription": "Freely is a fast, private AI assistant that lives as a discreet desktop overlay — meetings, interviews, coding, and daily tasks without drawing attention.",
     "category": "Productivity",

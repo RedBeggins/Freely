@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 
 help.txt
+
+# Release drafts (not committed; paste into GitHub manually if needed)
+PRIVATE_RELEASE*.md
+GITHUB_RELEASE*.md
