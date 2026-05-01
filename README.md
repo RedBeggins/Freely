@@ -1,4 +1,5 @@
 # Freely 🚀
+<img width="1695" height="933" alt="Screenshot 2026-05-01 130335" src="https://github.com/user-attachments/assets/3294e406-4709-44c8-b2eb-8da7ab5a1327" />
 
 [![Open Source](https://img.shields.io/badge/Open%20Source-❤️-blue)](https://github.com/RedBeggins/freely)
 [![Tauri](https://img.shields.io/badge/Built%20with-Tauri-orange)](https://tauri.app/)
